@@ -26,7 +26,7 @@ object ScreensaverPhotos {
     const val SOURCE_WIKIPEDIA = 1
     const val SOURCE_NASA = 2
     const val SOURCE_AURA = 3
-    val SOURCE_NAMES = listOf("Bing photo of the day", "Wikipedia picture of the day", "NASA picture of the day", "Aura wallpapers (offline)")
+    val SOURCE_NAMES = listOf("Bing photo of the day", "Wikipedia picture of the day", "NASA picture of the day", "GlowHome wallpapers (offline)")
 
     data class Cached(val file: File, val title: String, val credit: String)
 

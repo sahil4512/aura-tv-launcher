@@ -165,7 +165,7 @@ class MainActivity : Activity() {
     }
 
     // =====================================================================
-    // "Make Aura your home screen" (first start, and Settings → System)
+    // "Make GlowHome your home screen" (first start, and Settings → System)
     // =====================================================================
 
     private var homePromptTries = 0
@@ -193,8 +193,8 @@ class MainActivity : Activity() {
         if (homeStepStarted) {
             homeStepStarted = false
             val home = DefaultHome.isAuraHome(this)
-            Log.i(TAG, "home step finished, Aura is Home: $home")
-            if (home) toast("Aura is now your home screen")
+            Log.i(TAG, "home step finished, GlowHome is Home: $home")
+            if (home) toast("GlowHome is now your home screen")
             (overlays.lastOrNull() as? SettingsPanel)?.reload()
         }
     }
@@ -476,7 +476,7 @@ class MainActivity : Activity() {
                 addView(c, LinearLayout.LayoutParams(wrap(), wrap()).apply { if (i > 0) leftMargin = 10.dp })
                 if (c === chipSettings) c.setOnFocusChangeListener { _, has ->
                     if (moveKey != null) return@setOnFocusChangeListener
-                    hint.text = "Select: TV settings   ·   Hold Select or press ≡: Aura settings"
+                    hint.text = "Select: TV settings   ·   Hold Select or press ≡: GlowHome settings"
                     hint.visibility = if (has) View.VISIBLE else View.GONE
                 }
                 c.setOnKeyListener { _, code, e ->
@@ -1294,7 +1294,7 @@ class MainActivity : Activity() {
         prefs.favoritesSeeded = true
         prefs.knownApps = repo.apps.map { it.key }
         reloadEverything()
-        toast("Aura TV has been reset")
+        toast("GlowHome TV has been reset")
     }
 
     private fun reloadEverything() {
@@ -1318,8 +1318,8 @@ class MainActivity : Activity() {
         private const val HOME_PROMPT_DELAY_MS = 1_500L
         const val WIFI_NAME_HEADING = "Show your Wi-Fi name?"
         const val WIFI_NAME_MESSAGE = "Android asks for location permission before any app can read the name of " +
-            "your Wi-Fi network. Aura needs it only to show your Wi-Fi name on Home and never uses your location.\n" +
-            "If you'd rather not, choose Skip, or \u201cDon't allow\u201d on the next screen. Aura works the same; " +
+            "your Wi-Fi network. GlowHome needs it only to show your Wi-Fi name on Home and never uses your location.\n" +
+            "If you'd rather not, choose Skip, or \u201cDon't allow\u201d on the next screen. GlowHome works the same; " +
             "the chip just says \u201cWi-Fi\u201d."
     }
 }

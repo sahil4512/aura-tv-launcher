@@ -10,12 +10,15 @@ import java.io.File;
 import java.util.Random;
 
 /**
- * Procedurally paints Aura TV's original wallpapers, launcher icon and TV banner.
+ * Procedurally paints GlowHome TV's (formerly Aura TV) original wallpapers, launcher icon and TV banner.
  * Everything here is generated from math — no third-party imagery — so the art is ours to ship.
  *
  * Usage: java tools/AuraArt.java <app/src/main directory>
  */
 public class AuraArt {
+    /** The app's name as painted on the TV banner (the package and class names stay "aura"). */
+    static final String NAME = "GLOWHOME";
+
     static final int W = 1920, H = 1080;
 
     public static void main(String[] args) throws Exception {
@@ -562,8 +565,11 @@ public class AuraArt {
         Font f = new Font("Helvetica Neue", Font.PLAIN, (int) (H2 * 0.23));
         java.util.Map<java.awt.font.TextAttribute, Object> attrs = new java.util.HashMap<>();
         attrs.put(java.awt.font.TextAttribute.TRACKING, 0.32);
-        g.setFont(f.deriveFont(attrs));
-        g.drawString("AURA", (float) (W2 * 0.43), (float) (H2 * 0.585));
+        Font name = f.deriveFont(attrs);
+        // Shrink the name until it fits right of the mark (with a margin).
+        while (g.getFontMetrics(name).stringWidth(NAME) > W2 * 0.50) name = name.deriveFont(name.getSize2D() * 0.95f);
+        g.setFont(name);
+        g.drawString(NAME, (float) (W2 * 0.43), (float) (H2 * 0.585));
         g.setColor(new Color(255, 255, 255, 140));
         g.setFont(new Font("Helvetica Neue", Font.PLAIN, (int) (H2 * 0.10)).deriveFont(attrs));
         g.drawString("TV", (float) (W2 * 0.435), (float) (H2 * 0.75));

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-aura-setup: point Aura TV at a TV and it checks, installs, tunes, precompiles and measures.
+aura-setup: point GlowHome TV at a TV and it checks, installs, tunes, precompiles and measures.
 
     tools/aura-setup <tv-ip>:5555                 # full setup (asks before installing)
     tools/aura-setup <tv-ip>:5555 --check-only    # just look at the TV and say what would happen
@@ -9,11 +9,11 @@ Steps:
   1. Connect, and stop at once if something is playing or an app other than the home screen
      or Settings is open (never interrupts what you're watching).
   2. Look at the TV (read-only): model, OS, Android version, memory, CPU, GPU, screen, current
-     home app, installed Aura version.
-  3. Say which setup Aura will use on it (Light or Standard) and why, and what will be done.
+     home app, installed GlowHome version.
+  3. Say which setup GlowHome will use on it (Light or Standard) and why, and what will be done.
   4. Install the newest APK from dist/ (or --apk). Nothing else is ever uninstalled or disabled.
-  5. Precompile all of Aura's code (Android 7+), which makes it open about 20 % faster on slow chips.
-  6. Optional, only with your yes: usage access for the Fire TV Home button, or Aura as Home on
+  5. Precompile all of GlowHome's code (Android 7+), which makes it open about 20 % faster on slow chips.
+  6. Optional, only with your yes: usage access for the Fire TV Home button, or GlowHome as Home on
      Android TV.
   7. Measure launch time, memory, idle CPU and stutter, and write reports/<model>-<date>.md.
 
@@ -32,7 +32,7 @@ PKG = "com.auratv.launcher"
 ACTIVITY = f"{PKG}/.ui.MainActivity"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Screens on which it's safe to start working: home screens, Settings, Aura itself.
+# Screens on which it's safe to start working: home screens, Settings, GlowHome itself.
 SAFE_FOREGROUND = re.compile(r"launcher|home|tvlauncher|settings|" + re.escape(PKG), re.I)
 PLAYING = re.compile(r"state=3, position=[0-9-]+, buffered position=[0-9-]+, speed=1\.0")
 
@@ -149,7 +149,7 @@ def inspect(tv):
 
 
 def tier(info):
-    """The same rule Aura's DeviceProfile applies inside the app on its first start."""
+    """The same rule GlowHome's DeviceProfile applies inside the app on its first start."""
     why = []
     if info["low_ram"]:
         why.append("Android low-RAM mode")
@@ -187,10 +187,10 @@ def install(tv, apk):
     if "Success" in out:
         return
     if "UPDATE_INCOMPATIBLE" in out or "signatures do not match" in out:
-        fail("The Aura already on this TV was signed with a different key, so it can't be updated in place.\n"
-             f"  Uninstall it first (this resets Aura's settings): adb -s {tv.serial} uninstall {PKG}")
+        fail("The GlowHome already on this TV was signed with a different key, so it can't be updated in place.\n"
+             f"  Uninstall it first (this resets GlowHome's settings): adb -s {tv.serial} uninstall {PKG}")
     if "VERSION_DOWNGRADE" in out:
-        fail("The TV has a newer Aura than this APK. Use a newer APK, or uninstall first.")
+        fail("The TV has a newer GlowHome than this APK. Use a newer APK, or uninstall first.")
     fail(f"Install failed:\n{out}")
 
 
@@ -213,8 +213,8 @@ def pid_of(tv):
 
 
 def ready_to_measure(tv, wait_s=90):
-    """Measuring restarts Aura and presses arrow keys, so only do it while Aura is on screen and
-    nothing plays. On a first install Aura asks for the Wi-Fi name permission: wait for an answer."""
+    """Measuring restarts GlowHome and presses arrow keys, so only do it while GlowHome is on screen and
+    nothing plays. On a first install GlowHome asks for the Wi-Fi name permission: wait for an answer."""
     asked = False
     for _ in range(wait_s // 3):
         if PLAYING.search(tv.sh("dumpsys media_session")):
@@ -224,18 +224,18 @@ def ready_to_measure(tv, wait_s=90):
             return None
         if "permission" in fg or "packageinstaller" in fg:
             if not asked:
-                say("   Aura is asking on the TV whether it may show the Wi-Fi name. Answer it with the remote…")
+                say("   GlowHome is asking on the TV whether it may show the Wi-Fi name. Answer it with the remote…")
                 asked = True
             time.sleep(3)
             continue
-        return f"'{fg}' is on screen instead of Aura"
+        return f"'{fg}' is on screen instead of GlowHome"
     return "the question on the TV wasn't answered"
 
 
 def measure(tv):
     m = {"launch_ms": [], "warm_ms": []}
     for _ in range(3):
-        # Like a real cold start: Aura in the background (TV Settings in front), its process gone.
+        # Like a real cold start: GlowHome in the background (TV Settings in front), its process gone.
         tv.sh("am start -a android.settings.SETTINGS")
         time.sleep(2)
         for _ in range(3):  # Android 7 can restart a force-stopped app at once; stop until it's gone
@@ -263,7 +263,7 @@ def measure(tv):
         a = ticks(); time.sleep(5); b = ticks()
         m["idle_cpu"] = round((b - a) / 100 / 5 * 100, 1)  # % of one core (100 ticks/s)
 
-    # Stutter: move along the row and back, only while Aura is the app on screen.
+    # Stutter: move along the row and back, only while GlowHome is the app on screen.
     if foreground_package(tv) == PKG:
         tv.sh(f"dumpsys gfxinfo {PKG} reset")
         tv.sh("for k in 22 22 22 22 22 21 21 21 21 21; do input keyevent $k; sleep 0.4; done", timeout=120)
@@ -283,7 +283,7 @@ def launch_text(m):
     if m.get("launch_ms"):
         parts.append(f"cold {rng(m['launch_ms'])}")
     if m.get("warm_ms"):
-        parts.append(f"warm {rng(m['warm_ms'])} (Android kept Aura's process running)")
+        parts.append(f"warm {rng(m['warm_ms'])} (Android kept GlowHome's process running)")
     return ", ".join(parts) or "not measured"
 
 
@@ -292,12 +292,12 @@ def write_report(info, rows, w, why, version, applied, pre, m, extras):
     name = re.sub(r"[^A-Za-z0-9]+", "-", info.get("ro.product.model", "tv")).strip("-")
     path = os.path.join(ROOT, "reports", f"{name}-{datetime.date.today()}.md")
     with open(path, "w") as f:
-        f.write(f"# Aura TV on {info.get('ro.product.manufacturer', '')} {info.get('ro.product.model', '')}\n\n")
-        f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M} · Aura {version} · tools/aura-setup\n\n")
+        f.write(f"# GlowHome TV on {info.get('ro.product.manufacturer', '')} {info.get('ro.product.model', '')}\n\n")
+        f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M} · GlowHome {version} · tools/aura-setup\n\n")
         f.write("| | |\n|---|---|\n")
         for k, v in rows[:-1]:
             f.write(f"| {k} | {v} |\n")
-        f.write(f"| Setup | {w} ({', '.join(why)}) |\n| Aura's choice | {applied} |\n| Precompile | {pre} |\n")
+        f.write(f"| Setup | {w} ({', '.join(why)}) |\n| GlowHome's choice | {applied} |\n| Precompile | {pre} |\n")
         if m.get("skipped"):
             f.write(f"| Measurements | skipped: {m['skipped']} |\n")
         elif m:
@@ -315,17 +315,17 @@ def write_report(info, rows, w, why, version, applied, pre, m, extras):
 # ---------------------------------------------------------------- main
 
 def main():
-    ap = argparse.ArgumentParser(description="Check a TV, then install, tune, precompile and measure Aura TV on it.")
+    ap = argparse.ArgumentParser(description="Check a TV, then install, tune, precompile and measure GlowHome TV on it.")
     ap.add_argument("tv", help="the TV's address, e.g. 192.168.1.50:5555 (or an emulator serial)")
     ap.add_argument("--apk", help="APK to install (default: newest dist/AuraTV-*.apk)")
     ap.add_argument("--check-only", action="store_true", help="only look at the TV and print the plan; change nothing")
     ap.add_argument("--yes", action="store_true", help="install without asking (optional steps still need their own flag or a yes)")
     ap.add_argument("--grant-usage", action="store_true", help="Fire TV: grant usage access for the Home button redirect")
-    ap.add_argument("--set-home", action="store_true", help="Android TV: make Aura the Home app")
+    ap.add_argument("--set-home", action="store_true", help="Android TV: make GlowHome the Home app")
     ap.add_argument("--no-measure", action="store_true", help="skip the measurements")
     args = ap.parse_args()
 
-    say(f"Aura TV setup → {args.tv}\n")
+    say(f"GlowHome TV setup → {args.tv}\n")
     tv = connect(args.tv)
     fg = safety_gate(tv)
 
@@ -340,7 +340,7 @@ def main():
         ("Graphics", info["gles_short"]),
         ("Screen", f"{info.get('size', '?')} at {info.get('density', '?')} dpi"),
         ("Home app now", info["home"]),
-        ("Aura installed", info.get("aura") or "no"),
+        ("GlowHome installed", info.get("aura") or "no"),
         ("On screen", fg or "unknown"),
     ]
     for k, v in rows:
@@ -350,23 +350,23 @@ def main():
     say(f"\n2. Plan for this TV")
     say(f"   Setup: {w} ({', '.join(why)})")
     if w == "Light":
-        say("     Aura picks: solid background, Quick animations, Keep the TV Light on")
+        say("     GlowHome picks: solid background, Quick animations, Keep the TV Light on")
     else:
-        say("     Aura keeps its defaults (solid background, Normal animations, Keep the TV Light on)")
+        say("     GlowHome keeps its defaults (solid background, Normal animations, Keep the TV Light on)")
     if info.get("aura"):
-        say("     Aura is already installed, so it keeps the settings it has; this only updates it.")
+        say("     GlowHome is already installed, so it keeps the settings it has; this only updates it.")
     say(f"   Install: {os.path.relpath(apk, os.getcwd()) if apk else 'no APK found yet (see README)'}")
     say("   Precompile: " + ("yes (cmd package compile -m speed)" if info["api"] >= 24 else "not needed on Android 5–6"))
     if info["fire_os"]:
-        say("   Home button: Fire OS can't change its home screen; Aura's redirect can be turned on (usage access)")
+        say("   Home button: Fire OS can't change its home screen; GlowHome's redirect can be turned on (usage access)")
     elif info["api"] >= 24:
-        say("   Home button: Aura can be made the Home app (--set-home)")
+        say("   Home button: GlowHome can be made the Home app (--set-home)")
     if args.check_only:
         path = write_report(info, rows, w, why, info.get("aura") or "not installed",
                             "not run (--check-only)", "not run (--check-only)", {}, [])
         say(f"\n--check-only: nothing on the TV was changed. Report: {os.path.relpath(path, os.getcwd())}")
         return
-    if not args.yes and not ask("\nInstall Aura on this TV now?", True):
+    if not args.yes and not ask("\nInstall GlowHome on this TV now?", True):
         say("Nothing was changed.")
         return
 
@@ -375,34 +375,34 @@ def main():
     fresh = not info.get("aura")
     install(tv, apk)
     version = tv.sh(f"dumpsys package {PKG} | grep -m1 versionName").split("=")[-1]
-    say(f"   Installed Aura {version}")
+    say(f"   Installed GlowHome {version}")
 
     say("4. Precompiling")
     pre = precompile(tv, info["api"])
     say(f"   {pre}")
 
-    say("5. Starting Aura")
+    say("5. Starting GlowHome")
     tv.sh(f"am start -W -n {ACTIVITY}")
     time.sleep(4)
     prof = re.search(r"device profile: (.+)", tv.sh("logcat -d -s Aura:I"))
     applied = prof.group(1) if prof else ("chosen on an earlier install (kept)" if not fresh else "not seen in the log")
-    say(f"   Aura's own choice: {applied}")
+    say(f"   GlowHome's own choice: {applied}")
 
     extras = []
-    if info["fire_os"] and (args.grant_usage or ask("   Grant usage access so the Home button can open Aura?", False)):
+    if info["fire_os"] and (args.grant_usage or ask("   Grant usage access so the Home button can open GlowHome?", False)):
         tv.sh(f"appops set {PKG} GET_USAGE_STATS allow")
         extras.append("Usage access granted. Turn the redirect on in Aura: Settings → System → Home Button.")
     if not info["fire_os"] and info["api"] >= 24 and \
-            (args.set_home or ask("   Make Aura the Home app?", sys.stdin.isatty())):
+            (args.set_home or ask("   Make GlowHome the Home app?", sys.stdin.isatty())):
         out = tv.sh(f"cmd package set-home-activity {ACTIVITY}")
-        extras.append(("Aura is now the Home app." if "Success" in out or not out else f"Setting Home failed: {out}")
+        extras.append(("GlowHome is now the Home app." if "Success" in out or not out else f"Setting Home failed: {out}")
                       + f" To undo: adb -s {tv.serial} shell cmd package set-home-activity {info['home']}")
     for e in extras:
         say(f"   {e}")
 
     m = {}
     if not args.no_measure:
-        say("6. Measuring (about a minute; Aura will restart a few times)")
+        say("6. Measuring (about a minute; GlowHome will restart a few times)")
         why_not = ready_to_measure(tv)
         if why_not:
             say(f"   Skipped: {why_not}")

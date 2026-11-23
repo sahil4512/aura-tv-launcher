@@ -76,7 +76,7 @@ class Prefs(context: Context) {
     var knownApps by list("known_apps")
 
     var videoWarningShown by bool("video_warning_shown", false)
-    /** The first-start "Make Aura your home screen" prompt was answered (or dismissed) once. */
+    /** The first-start "Make GlowHome your home screen" prompt was answered (or dismissed) once. */
     var homePromptAnswered by bool("home_prompt_answered", false)
 
     fun hiddenSet(): Set<String> = hidden.toHashSet()
@@ -107,7 +107,7 @@ class Prefs(context: Context) {
 
     /** Returns the number of values restored. Throws on a file that is not an Aura backup. */
     fun restoreJson(root: JSONObject): Int {
-        require(root.optString("format") == "aura-tv-backup") { "Not an Aura TV backup file" }
+        require(root.optString("format") == "aura-tv-backup") { "Not a GlowHome TV backup file" }
         val values = root.getJSONObject("values")
         val e = sp.edit()
         e.clear()

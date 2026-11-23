@@ -1,8 +1,8 @@
-# Contributing to Aura TV
+# Contributing to GlowHome TV
 
-Thanks for helping. A few things keep Aura fast and safe:
+Thanks for helping. A few things keep GlowHome fast and safe:
 
-- **Keep it light.** Aura uses Android's built-in views only: no AndroidX, Leanback, Compose,
+- **Keep it light.** GlowHome uses Android's built-in views only: no AndroidX, Leanback, Compose,
   WebView or Play Services. A new dependency needs a very good reason and measurements.
 - **Measure on a slow TV or the emulator** before and after a change that could affect speed
   (`tools/perf_compare.py`). Numbers beat opinions.

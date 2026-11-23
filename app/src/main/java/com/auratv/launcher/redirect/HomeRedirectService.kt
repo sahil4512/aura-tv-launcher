@@ -178,8 +178,8 @@ class HomeRedirectService : Service() {
             Notification.Builder(this).setPriority(Notification.PRIORITY_MIN)
         }
         return b.setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("Aura TV")
-            .setContentText("Home button opens Aura")
+            .setContentTitle("GlowHome TV")
+            .setContentText("Home button opens GlowHome")
             .setOngoing(true)
             .setShowWhen(false)
             .build()

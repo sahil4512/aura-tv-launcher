@@ -643,8 +643,8 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         val fire = HomeRedirect.isFireOs(ctx)
         items += Action(if (fire) "Fire TV Settings" else "TV Settings", "Network, picture, sound, apps…") { activity.openSystemSettings() }
         if (fire) items += Nav("Home Button", { homeButtonSummary() }) { push(homeButtonPage()) }
-        else items += Action("Make Aura Your Home Screen",
-            if (DefaultHome.isAuraHome(ctx)) "Done: the Home button opens Aura" else "So the Home button opens Aura") { activity.offerDefaultHome() }
+        else items += Action("Make GlowHome Your Home Screen",
+            if (DefaultHome.isAuraHome(ctx)) "Done: the Home button opens GlowHome" else "So the Home button opens GlowHome") { activity.offerDefaultHome() }
         items += Toggle("Keep the TV Light", "When you open an app, close other apps running in the background",
             { p.keepTvLight }, { p.keepTvLight = it })
         items += Section("Backup")
@@ -653,8 +653,8 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
             activity.openOverlay(ConfirmOverlay(activity, "Restore settings?", "Your current settings will be replaced with the backup.",
                 listOf("Restore" to { activity.restoreSettings() }, "Cancel" to {})))
         }
-        items += Action("Reset Aura TV", "Theme, wallpaper, favourites — everything") {
-            activity.openOverlay(ConfirmOverlay(activity, "Reset Aura TV?",
+        items += Action("Reset GlowHome TV", "Theme, wallpaper, favourites — everything") {
+            activity.openOverlay(ConfirmOverlay(activity, "Reset GlowHome TV?",
                 "All settings, favourites and hidden apps go back to defaults. Imported images are kept.",
                 listOf("Reset everything" to { activity.resetAll() }, "Cancel" to {})))
         }
@@ -673,17 +673,17 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
     private fun homeButtonPage() = Page("Home Button") {
         val items = ArrayList<Item>()
         if (!HomeRedirect.isFireOs(ctx)) {
-            items += Info("This device lets you choose Aura as the Home app directly.", "")
-            items += Action("Make Aura Your Home Screen") { activity.offerDefaultHome() }
+            items += Info("This device lets you choose GlowHome as the Home app directly.", "")
+            items += Action("Make GlowHome Your Home Screen") { activity.offerDefaultHome() }
             return@Page items
         }
         val hijack = HomeRedirect.installedHijack(ctx)
-        items += Toggle("Open Aura With the Home Button", "Built into Aura — no extra app needed", { p.redirectEnabled }) { on ->
+        items += Toggle("Open GlowHome With the Home Button", "Built into GlowHome — no extra app needed", { p.redirectEnabled }) { on ->
             if (on && hijack != null) {
                 activity.openOverlay(ConfirmOverlay(activity, "Launcher Hijack is installed",
-                    "If it is still redirecting Home to another launcher, the two will compete. While testing Aura's redirect, " +
-                        "stop Launcher Hijack (or point it at Aura). You can switch back at any time.",
-                    listOf("Turn on Aura's redirect" to { p.redirectEnabled = true; applyRedirect(); reload() }, "Cancel" to { reload() })))
+                    "If it is still redirecting Home to another launcher, the two will compete. While testing GlowHome's redirect, " +
+                        "stop Launcher Hijack (or point it at GlowHome). You can switch back at any time.",
+                    listOf("Turn on GlowHome's redirect" to { p.redirectEnabled = true; applyRedirect(); reload() }, "Cancel" to { reload() })))
             } else {
                 p.redirectEnabled = on
                 applyRedirect()
@@ -694,7 +694,7 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         if (!access) items += Info("Grant it once from a computer:\n${HomeRedirect.usageAccessCommand(ctx)}", "")
         items += Choice("Detection Speed", HomeRedirect.SPEED_NAMES, { p.redirectSpeed }, { p.redirectSpeed = it; applyRedirect() },
             "Fire OS holds app switches for about 5 s after Home; faster detection mainly helps after Back")
-        items += Toggle("Double-Press Home for Amazon Home", "Press Home again within 3 s of Aura appearing",
+        items += Toggle("Double-Press Home for Amazon Home", "Press Home again within 3 s of GlowHome appearing",
             { p.redirectDoublePress }, { p.redirectDoublePress = it; applyRedirect() })
         items += Toggle("Keep Running in Background", "Recommended on 1.5 GB devices", { p.redirectResident },
             { p.redirectResident = it; applyRedirect() })
@@ -704,7 +704,7 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         items += Section("Experimental")
         val acc = HomeRedirect.accessibilityEnabled(ctx)
         items += Toggle("Instant Mode (Accessibility)",
-            if (acc) "Accessibility service enabled · hold Home for Amazon Home" else "Needs the Aura accessibility service enabled (see README)",
+            if (acc) "Accessibility service enabled · hold Home for Amazon Home" else "Needs the GlowHome accessibility service enabled (see README)",
             { p.redirectInstant }, { p.redirectInstant = it; applyRedirect() })
         items += Section("Recent Redirects")
         val log = p.redirectLog

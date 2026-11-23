@@ -1,5 +1,5 @@
 name: Problem on my TV
-description: Aura doesn't work right, or is slow, on a TV
+description: GlowHome doesn't work right, or is slow, on a TV
 labels: [tv-report]
 body:
   - type: textarea
@@ -23,5 +23,5 @@ body:
   - type: input
     id: version
     attributes:
-      label: Aura version
+      label: GlowHome version
       description: Settings → About → Version

@@ -8,7 +8,7 @@ import android.os.Build
 import android.provider.Settings
 
 /**
- * "Make Aura your home screen". Android never lets an app make itself the default Home app, so Aura
+ * "Make GlowHome your home screen". Android never lets an app make itself the default Home app, so Aura
  * asks the viewer, using the most each TV allows. [DefaultHomePolicy] picks the way; this object
  * reads the device and starts it.
  */
@@ -113,22 +113,22 @@ object DefaultHomePolicy {
     class Prompt(val heading: String, val message: String, val goLabel: String?)
 
     fun prompt(route: Route): Prompt = when (route) {
-        Route.ROLE -> Prompt("Make Aura your home screen",
-            "Aura will open whenever you press Home on the remote. On the next screen, select Aura TV, " +
-                "then Set as default. You can switch back at any time in the TV's settings.", "Make Aura my home screen")
-        Route.HOME_SETTINGS -> Prompt("Make Aura your home screen",
-            "Aura will open whenever you press Home on the remote. On the next screen, choose Aura TV. " +
-                "You can switch back there at any time.", "Choose Aura TV")
-        Route.CHOOSER -> Prompt("Make Aura your home screen",
-            "Aura will open whenever you press Home on the remote. On the next screen, choose Aura TV, then Always.",
-            "Choose Aura TV")
-        Route.FIRE_TV -> Prompt("Open Aura with the Home button",
-            "Fire TV always keeps Amazon's home screen and doesn't let apps replace it. Aura can still come up " +
-                "when you press Home: turn on Settings → System → Home Button in Aura. It needs one step from a computer:\n" +
+        Route.ROLE -> Prompt("Make GlowHome your home screen",
+            "GlowHome will open whenever you press Home on the remote. On the next screen, select GlowHome TV, " +
+                "then Set as default. You can switch back at any time in the TV's settings.", "Make GlowHome my home screen")
+        Route.HOME_SETTINGS -> Prompt("Make GlowHome your home screen",
+            "GlowHome will open whenever you press Home on the remote. On the next screen, choose GlowHome TV. " +
+                "You can switch back there at any time.", "Choose GlowHome TV")
+        Route.CHOOSER -> Prompt("Make GlowHome your home screen",
+            "GlowHome will open whenever you press Home on the remote. On the next screen, choose GlowHome TV, then Always.",
+            "Choose GlowHome TV")
+        Route.FIRE_TV -> Prompt("Open GlowHome with the Home button",
+            "Fire TV always keeps Amazon's home screen and doesn't let apps replace it. GlowHome can still come up " +
+                "when you press Home: turn on Settings → System → Home Button in GlowHome. It needs one step from a computer:\n" +
                 "tools/aura-setup <tv-ip>:5555 --grant-usage", "Open Home Button settings")
-        Route.COMPUTER -> Prompt("Make Aura your home screen",
+        Route.COMPUTER -> Prompt("Make GlowHome your home screen",
             "This TV keeps its own home screen and doesn't let apps change that from the TV itself.\n$COMPUTER_STEPS",
             null)
-        Route.ALREADY_HOME -> Prompt("Aura is your home screen", "Aura already opens when you press Home.", null)
+        Route.ALREADY_HOME -> Prompt("GlowHome is your home screen", "GlowHome already opens when you press Home.", null)
     }
 }

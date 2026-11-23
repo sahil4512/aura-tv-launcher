@@ -4,7 +4,7 @@ tv-cleanup: turn off a TV's ads, telemetry and unused preinstalled services, rev
 
     tools/tv-cleanup <tv-ip>:5555                 # preview only: shows what it would turn off
     tools/tv-cleanup <tv-ip>:5555 --apply         # turn off the safe ones, ask about each optional one
-    tools/tv-cleanup <tv-ip>:5555 --apply --replace-home   # also turn off the TV's own home screen (Aura must be installed)
+    tools/tv-cleanup <tv-ip>:5555 --apply --replace-home   # also turn off the TV's own home screen (GlowHome must be installed)
     tools/tv-cleanup <tv-ip>:5555 --restore       # turn everything back on
 
 How it stays safe:
@@ -13,8 +13,8 @@ How it stays safe:
     every run also saves a restore script in reports/.
   - Only packages in tools/cleanup/packages.txt are touched, each with a note on what you lose.
   - Never touched: Settings, the system UI, the package installer, Google Play and its services,
-    the keyboard in use, the current home screen (unless --replace-home), and Aura itself.
-  - The TV's home screen is only turned off when Aura then really becomes Home; otherwise it's
+    the keyboard in use, the current home screen (unless --replace-home), and GlowHome itself.
+  - The TV's home screen is only turned off when GlowHome then really becomes Home; otherwise it's
     turned straight back on.
   - Stops if anything is playing on the TV, like aura-setup.
 Fire TV: Fire OS doesn't let apps turn off Amazon's system apps without root, so there's little
@@ -80,7 +80,7 @@ def main():
     ap.add_argument("--apply", action="store_true", help="actually turn things off (default: preview only)")
     ap.add_argument("--yes", action="store_true", help="don't ask before turning off the safe ones")
     ap.add_argument("--include-optional", action="store_true", help="also turn off every optional one without asking")
-    ap.add_argument("--replace-home", action="store_true", help="also turn off the TV's own home screen, making Aura Home")
+    ap.add_argument("--replace-home", action="store_true", help="also turn off the TV's own home screen, making GlowHome Home")
     ap.add_argument("--restore", action="store_true", help="turn back on everything this tool can turn off")
     args = ap.parse_args()
 
@@ -130,7 +130,7 @@ def main():
                 skipped.append((p, "home screen: only with --replace-home"))
                 continue
             if not aura_installed:
-                skipped.append((p, "home screen: install Aura first (tools/aura-setup)"))
+                skipped.append((p, "home screen: install GlowHome first (tools/aura-setup)"))
                 continue
         elif p == home_pkg:
             skipped.append((p, "it's the current home screen"))
@@ -140,7 +140,7 @@ def main():
     say(f"{model} · Android API {api} · home: {home or 'unknown'}\n")
     labels = {"safe": "Safe to turn off (you lose nothing you'd notice)",
               "optional": "Optional (you lose a feature: asked one by one)",
-              "home": "Home screen (replaced by Aura)"}
+              "home": "Home screen (replaced by GlowHome)"}
     total = 0
     for tier in ("safe", "optional", "home"):
         if not rows[tier]:
@@ -169,7 +169,7 @@ def main():
         if args.include_optional or ask(f"Turn off {e['what']}? ({e['lose']})", False):
             chosen.append(e)
     home_rows = rows["home"]
-    if home_rows and not args.yes and not ask("Turn off the TV's own home screen and make Aura Home?", False):
+    if home_rows and not args.yes and not ask("Turn off the TV's own home screen and make GlowHome Home?", False):
         home_rows = []
     if not chosen and not home_rows:
         say("Nothing was changed.")
@@ -195,12 +195,12 @@ def main():
         tv.sh(f"cmd package set-home-activity {AURA_HOME}")
         now = current_home(tv)
         if now == AURA_HOME:
-            say(f"   ✓ Aura is now Home ({len(off)} home-screen packages turned off)")
+            say(f"   ✓ GlowHome is now Home ({len(off)} home-screen packages turned off)")
             done += off
         else:
             for p in off:
                 enable(tv, p)
-            say(f"   ✗ Aura didn't become Home (Home is {now or 'unknown'}), so the home screen was turned back on.")
+            say(f"   ✗ GlowHome didn't become Home (Home is {now or 'unknown'}), so the home screen was turned back on.")
 
     # restore script
     os.makedirs(os.path.join(os.path.dirname(HERE), "reports"), exist_ok=True)

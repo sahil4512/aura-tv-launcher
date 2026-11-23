@@ -1,8 +1,10 @@
-# Aura TV
+# GlowHome TV
+
+*Formerly **Aura TV**. Same app, new name (another launcher is called "Aura"). It updates in place and keeps your settings.*
 
 **A fast, minimal home screen (launcher) for Android TV and Amazon Fire TV.**
 
-Aura TV replaces your TV's cluttered home screen with one clean row of the apps you actually use.
+GlowHome TV replaces your TV's cluttered home screen with one clean row of the apps you actually use.
 It has no ads, no accounts and no tracking. It is built to stay quick on slow, cheap TV chips.
 
 ### ⬇ [Download AuraTV.apk](https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.apk)
@@ -20,15 +22,15 @@ https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.ap
 Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 [Full setup with a computer](#full-setup-with-a-computer)
 
-[![Same TV, press Home: Google's TV launcher 4.9 s vs Aura 0.9 s. Click to watch the video](docs/aura-promo.gif)](https://github.com/sahil4512/aura-tv-launcher/releases/download/v0.6.6/aura-tv-launcher-promo.mp4)
+[![Same TV, press Home: Google's TV launcher 4.9 s vs GlowHome 0.9 s. Click to watch the video](docs/aura-promo.gif)](https://github.com/sahil4512/aura-tv-launcher/releases/download/v0.6.6/aura-tv-launcher-promo.mp4)
 
 ▶ **[Watch the 45-second video](https://github.com/sahil4512/aura-tv-launcher/releases/download/v0.6.6/aura-tv-launcher-promo.mp4)**
 
-![Aura TV home screen on a Fire TV](docs/home.png)
+![GlowHome TV home screen on a Fire TV](docs/home.png)
 
 - **Small and light.** About 1.3 MB to download and about 27 MB of memory while running. It uses
   no CPU while idle on the home screen.
-- **Tunes itself to your TV.** On first start, Aura checks your TV's memory and processor. On a
+- **Tunes itself to your TV.** On first start, GlowHome checks your TV's memory and processor. On a
   slow or low-memory TV it picks the lightest setup by itself.
 - **Works with any standard remote.** Arrows, Select, Back, Home and Menu are all you need.
 - **Private.** No accounts, telemetry or ads. The only time it uses the internet is for the
@@ -41,11 +43,11 @@ Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 
 - [Which TVs it works on](#which-tvs-it-works-on)
 - [Install it on your TV](#install-it-on-your-tv)
-- [Make Aura your home screen](#make-aura-your-home-screen)
+- [Make GlowHome your home screen](#make-glowhome-your-home-screen)
 - [Clean up your TV (optional)](#clean-up-your-tv-optional)
-- [Using Aura](#using-aura)
+- [Using GlowHome](#using-glowhome)
 - [Settings](#settings)
-- [How Aura stays fast](#how-aura-stays-fast)
+- [How GlowHome stays fast](#how-glowhome-stays-fast)
 - [Privacy and permissions](#privacy)
 - [Troubleshooting](#troubleshooting)
 - [Uninstall](#uninstall)
@@ -72,7 +74,7 @@ If you try it on another TV, please open an issue and say how it went.
 ## Install it on your TV
 
 There are two ways. **Quick install** needs only the TV and its remote. **Full setup** uses a
-computer and also tunes, precompiles and measures Aura on your TV in one go.
+computer and also tunes, precompiles and measures GlowHome on your TV in one go.
 
 ### Quick install (no computer)
 
@@ -90,11 +92,11 @@ https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.ap
      Downloader → On. (On some TVs: Settings → Device Preferences → Security & restrictions.)
 3. Open Downloader, enter the code **1212393** (or the address above), and choose **Install**
    when it finishes downloading.
-4. Open **Aura TV**. It checks your TV and picks the right setup by itself on first start.
+4. Open **GlowHome TV**. It checks your TV and picks the right setup by itself on first start.
 
-Then see [Make Aura your home screen](#make-aura-your-home-screen).
+Then see [Make GlowHome your home screen](#make-glowhome-your-home-screen).
 
-Android compiles Aura for your TV's chip on its own while the TV is idle, usually within a day,
+Android compiles GlowHome for your TV's chip on its own while the TV is idle, usually within a day,
 so it gets a little faster after the first day. The full setup below does that immediately.
 
 ### Full setup (with a computer)
@@ -120,7 +122,7 @@ It looks like `192.168.1.50`. Below, replace `<tv-ip>` with it.
 - **Windows / Linux:** download [Android SDK Platform-Tools](https://developer.android.com/tools/releases/platform-tools)
   and unzip it.
 
-#### 4. Download Aura
+#### 4. Download GlowHome
 
 Get the newest `AuraTV-x.y.z.apk` from the [Releases](../../releases) page and put it in this
 repo's `dist/` folder (or anywhere you like). Each release also lists the file's SHA-256, so you
@@ -142,12 +144,12 @@ and select OK. Then `aura-setup`:
 1. **Checks that the TV is free.** If something is playing, or an app other than the home screen
    or Settings is open, it stops without changing anything.
 2. **Looks at the TV** (read-only): model, Fire OS or Android TV, Android version, memory, CPU
-   speed, graphics, screen, current home app, and any Aura already installed.
-3. **Shows the plan** for this TV, including which setup Aura will pick (Light or Standard, see
-   [How Aura stays fast](#how-aura-stays-fast)), and asks before installing.
+   speed, graphics, screen, current home app, and any GlowHome already installed.
+3. **Shows the plan** for this TV, including which setup GlowHome will pick (Light or Standard, see
+   [How GlowHome stays fast](#how-glowhome-stays-fast)), and asks before installing.
 4. **Installs** the newest APK from `dist/`. It never uninstalls or disables anything else.
-5. **Precompiles** Aura so it opens faster (Android 7 and newer).
-6. **Asks about the optional steps:** usage access for the Fire TV Home button, or making Aura the
+5. **Precompiles** GlowHome so it opens faster (Android 7 and newer).
+6. **Asks about the optional steps:** usage access for the Fire TV Home button, or making GlowHome the
    Home app on Android TV (just press Enter: the answer defaults to yes). Nothing happens without your yes.
 7. **Measures** launch time, memory, idle CPU and stutter, and saves a report in `reports/`.
    If something isn't right on your TV, attach that report to a GitHub issue.
@@ -170,42 +172,42 @@ adb -s <tv-ip>:5555 shell cmd package compile -m speed -f com.auratv.launcher
 
 ---
 
-## Make Aura your home screen
+## Make GlowHome your home screen
 
 ### Android TV / Google TV
 
-**Aura asks you itself.** The first time you open it, Aura shows *Make Aura your home screen* and
+**GlowHome asks you itself.** The first time you open it, GlowHome shows *Make GlowHome your home screen* and
 does the most your TV allows. Android never lets an app make itself the home screen without you,
 so you confirm once:
 
-- **Android 10 and newer:** select *Make Aura my home screen*. In the TV's own dialog, select **Aura TV**, then *Set as default*.
-- **Older Android TV:** Aura opens the TV's Home app settings, or the "which app?" chooser.
-  Pick **Aura TV** (and *Always*).
+- **Android 10 and newer:** select *Make GlowHome my home screen*. In the TV's own dialog, select **GlowHome TV**, then *Set as default*.
+- **Older Android TV:** GlowHome opens the TV's Home app settings, or the "which app?" chooser.
+  Pick **GlowHome TV** (and *Always*).
 - **TVs that never let you choose** (stock Google TV launchers that always win, and TVs whose maker
-  locked the home screen): Aura says so and shows the one command that does it from a computer:
+  locked the home screen): GlowHome says so and shows the one command that does it from a computer:
   ```bash
   tools/aura-setup <tv-ip>:5555 --set-home
   ```
   or, to also turn the TV's own home screen off (reversible): `tools/tv-cleanup <tv-ip>:5555 --apply --replace-home`.
 
 *Not now* is remembered, and the prompt never comes back on its own. To do it later:
-Aura **Settings → System → Make Aura Your Home Screen**. Until then Aura works as a normal app:
+GlowHome **Settings → System → Make GlowHome Your Home Screen**. Until then GlowHome works as a normal app:
 open it from the app list.
 
 ### Fire TV
 
 Fire OS doesn't let you change the home screen. Pressing Home always starts Amazon Home first.
-Aura has a **built-in Home button redirect** that brings Aura up instead. On first start Aura
+GlowHome has a **built-in Home button redirect** that brings GlowHome up instead. On first start GlowHome
 explains this and can take you straight to its Home Button settings. The redirect is off until you
 turn it on:
 
-1. Give Aura permission to see which app is on screen (one time, from your computer; `aura-setup`
+1. Give GlowHome permission to see which app is on screen (one time, from your computer; `aura-setup`
    offers to do this for you):
    ```bash
    adb -s <tv-ip>:5555 shell appops set com.auratv.launcher GET_USAGE_STATS allow
    ```
-2. In Aura: **Settings → System → Home Button → Open Aura With the Home Button → On.**
-3. Press Home. Amazon Home appears briefly, then Aura comes up.
+2. In Aura: **Settings → System → Home Button → Open GlowHome With the Home Button → On.**
+3. Press Home. Amazon Home appears briefly, then GlowHome comes up.
 
 What to expect:
 
@@ -213,11 +215,11 @@ What to expect:
   Android: after Home is pressed, it holds back other apps from opening for 5 seconds. Every
   Fire TV launcher without root has the same delay. Backing out of an app to Amazon Home is
   redirected almost instantly (about 0.2 s).
-- **To get to Amazon Home on purpose,** press Home twice (within 3 seconds of Aura appearing), or
+- **To get to Amazon Home on purpose,** press Home twice (within 3 seconds of GlowHome appearing), or
   use Settings → System → Home Button → *Open Amazon Home*.
 - **Amazon's own Settings screens are never redirected,** so you can still use them normally.
 - **If you use Launcher Hijack** or a similar app, turn one of the two off. Two redirects fight
-  each other. Aura warns you if it finds one.
+  each other. GlowHome warns you if it finds one.
 
 The redirect runs as a tiny separate process (about 7 MB), stops completely while the screen is
 off, and has loop protection (it pauses itself if it ever redirects too often).
@@ -249,7 +251,7 @@ tools/tv-cleanup <tv-ip>:5555 --apply
 - **Safe** ones (telemetry, promos, unused extras) are turned off after one yes.
 - **Optional** ones cost a feature, so you're asked about each, for example *"Google voice search:
   the remote's mic button stops working"* or *"Chromecast built-in: you can't cast"*.
-- **The TV's own home screen** is only turned off with `--replace-home`, and only if Aura then
+- **The TV's own home screen** is only turned off with `--replace-home`, and only if GlowHome then
   really becomes Home. If it doesn't, it's turned straight back on.
 - **Never touched:** Settings, the system UI, Google Play and its services, the keyboard you use,
   and anything not on the [reviewed list](tools/cleanup/packages.txt).
@@ -271,7 +273,7 @@ does and what turning it off costs, and open a pull request.
 
 ---
 
-## Using Aura
+## Using GlowHome
 
 | Remote button | What it does on the home screen |
 |---|---|
@@ -279,7 +281,7 @@ does and what turning it off costs, and open a pull request.
 | ▲ ▼ | Move between rows and the top bar (All Apps, Wi-Fi, Settings) |
 | Select | Open the app |
 | **Hold Select** or **≡ Menu** on an app | App options: Open, Move, Add or remove favourite, Hide, App info, Uninstall |
-| ≡ Menu on a top-bar button | Aura's settings |
+| ≡ Menu on a top-bar button | GlowHome's settings |
 | Back | Closes menus. On the home screen it jumps back to the first app |
 
 - **Add an app to Home:** open **All Apps**, hold Select on the app, choose *Add to Favourites*.
@@ -287,16 +289,16 @@ does and what turning it off costs, and open a pull request.
 - **Reorder:** hold Select on a favourite, choose **Move**, use ◀ ▶, then press Select.
 - **Hide an app:** hold Select, then *Hide from Home*. Find it again under Settings → Apps → Hidden
   Apps.
-- **Home brings you back where you were.** When you return to Aura, the app you last opened is
+- **Home brings you back where you were.** When you return to GlowHome, the app you last opened is
   already selected.
 - **The Settings button in the top bar opens your TV's own settings** (network, picture, sound).
-  For Aura's settings, hold Select on that button, or press ≡ Menu while it is selected.
+  For GlowHome's settings, hold Select on that button, or press ≡ Menu while it is selected.
 
 ### Screensaver
 
-Aura includes a screensaver that shows a photo of the day (from Bing, Wikipedia or NASA) with
-the time, or Aura's own built-in artwork when offline. Choose **Aura TV** in your TV's
-screensaver (Daydream) settings to use it. Photos are only downloaded if Aura is actually your
+GlowHome includes a screensaver that shows a photo of the day (from Bing, Wikipedia or NASA) with
+the time, or GlowHome's own built-in artwork when offline. Choose **GlowHome TV** in your TV's
+screensaver (Daydream) settings to use it. Photos are only downloaded if GlowHome is actually your
 chosen screensaver.
 
 ---
@@ -308,10 +310,10 @@ chosen screensaver.
 | **Appearance** | 5 themes (Midnight, Minimal Dark, Soft Glass, Cinematic, Warm Ambient), accent colour, clock and date, 12/24-hour, greeting, background (Solid or Ambient glow) |
 | **Apps** | Favourites, hidden apps, auto-add new apps, show system utilities, All Apps order, refresh app list, reset favourites |
 | **Layout** | One favourites row or an All Apps grid, tile size, row position, Recently Used row, extra All Apps row, animation speed (Relaxed / Normal / Quick / Off) |
-| **System** | TV settings shortcut, Make Aura Your Home Screen (Android TV) or Home Button (Fire TV), **Keep the TV Light**, backup / restore, reset |
-| **About** | Version, your TV model, how long Home took to start, memory in use, and how Aura tuned itself for this TV |
+| **System** | TV settings shortcut, Make GlowHome Your Home Screen (Android TV) or Home Button (Fire TV), **Keep the TV Light**, backup / restore, reset |
+| **About** | Version, your TV model, how long Home took to start, memory in use, and how GlowHome tuned itself for this TV |
 
-**Keep the TV Light** (on by default): a few seconds after you open an app from Aura, Aura closes
+**Keep the TV Light** (on by default): a few seconds after you open an app from GlowHome, GlowHome closes
 other apps that are sitting in the background using memory, for example Netflix's background
 service. The app you are watching is never touched, and neither are system apps. This makes a big
 difference on TVs with little memory. It has no effect on Android 14 and newer, which don't allow it.
@@ -321,9 +323,9 @@ From Backup* reads it back, for example after reinstalling.
 
 ---
 
-## How Aura stays fast
+## How GlowHome stays fast
 
-Most TV launchers are slow because the TV's processor is slow. Aura is designed around that:
+Most TV launchers are slow because the TV's processor is slow. GlowHome is designed around that:
 
 - **No heavy libraries.** It is written in Kotlin with Android's own built-in views only: no
   AndroidX, Leanback, Compose, WebView or Google Play Services.
@@ -333,10 +335,10 @@ Most TV launchers are slow because the TV's processor is slow. Aura is designed 
   screen isn't redrawn while idle (0 % CPU). On the TCL TV, a moving wallpaper had cost about a
   quarter of one processor core all the time.
 - **Tunes itself on first start.** If the TV is in Android's low-memory mode, has under 2 GB of
-  memory, or a processor at 1.2 GHz or slower, Aura picks the solid background, quick animations
+  memory, or a processor at 1.2 GHz or slower, GlowHome picks the solid background, quick animations
   and Keep the TV Light. Settings → About shows what it chose. You can change any of it.
-- **Precompiled code.** `tools/aura-setup` asks Android to compile all of Aura ahead of
-  time (`cmd package compile -m speed`). On a slow TV chip this made Aura open about 20 % faster.
+- **Precompiled code.** `tools/aura-setup` asks Android to compile all of GlowHome ahead of
+  time (`cmd package compile -m speed`). On a slow TV chip this made GlowHome open about 20 % faster.
   Android undoes this on every update, so the script does it again on every install.
 
 ### Measured on a real TV
@@ -346,7 +348,7 @@ TCL Android TV 9 with a 4 × 900 MHz Realtek chip, 1.4 GB of memory, 720p
 
 | | Before tuning (0.5.1) | **Now (0.6.3+)** |
 |---|---|---|
-| Aura opening from cold | 587–802 ms | **271–286 ms** |
+| GlowHome opening from cold | 587–802 ms | **271–286 ms** |
 | Returning to Home | 350 ms | **179 ms** |
 | CPU while idle on Home | ~26 % of a core | **0 %** |
 | Memory | 38.2 MB | **26.5 MB** |
@@ -368,20 +370,20 @@ per app in your browser (at http://localhost:8765).
 
 ## Privacy
 
-Aura has no accounts, analytics, ads or crash reporting, and sends nothing about you anywhere.
+GlowHome has no accounts, analytics, ads or crash reporting, and sends nothing about you anywhere.
 
 **Network:** the only network use is the screensaver's photo of the day (Bing, Wikipedia or
-NASA), and only while Aura is your chosen screensaver.
+NASA), and only while GlowHome is your chosen screensaver.
 
 **Why each permission is needed:**
 
 | Permission | Used for |
 |---|---|
-| Usage access (`PACKAGE_USAGE_STATS`) | The Fire TV Home button redirect, and the Recently Used row. Granted by you over adb; Aura works without it |
+| Usage access (`PACKAGE_USAGE_STATS`) | The Fire TV Home button redirect, and the Recently Used row. Granted by you over adb; GlowHome works without it |
 | Accessibility service | Only the experimental instant Home button mode on Fire TV. Off unless you turn it on |
-| Location (`ACCESS_COARSE_LOCATION`) | Only to show your Wi-Fi network's name in the top bar (Android 8.1+ requires it for that). Aura never reads your location. Say no and the chip just shows "Wi-Fi" |
+| Location (`ACCESS_COARSE_LOCATION`) | Only to show your Wi-Fi network's name in the top bar (Android 8.1+ requires it for that). GlowHome never reads your location. Say no and the chip just shows "Wi-Fi" |
 | Close background apps (`KILL_BACKGROUND_PROCESSES`) | Keep the TV Light |
-| Storage | Backup and restore of Aura's settings |
+| Storage | Backup and restore of GlowHome's settings |
 | Start at boot, foreground service | Restarting the Home button redirect after the TV restarts, only if you turned it on |
 | Internet | The screensaver photo |
 
@@ -405,12 +407,12 @@ NASA), and only while Aura is your chosen screensaver.
 ## Uninstall
 
 1. On Fire TV, turn the redirect off first: Settings → System → Home Button → Off.
-2. Remove Aura from the TV's app settings, or from your computer:
+2. Remove GlowHome from the TV's app settings, or from your computer:
    ```bash
    adb -s <tv-ip>:5555 uninstall com.auratv.launcher
    ```
 
-Aura never changes system settings or other apps, so nothing else needs undoing.
+GlowHome never changes system settings or other apps, so nothing else needs undoing.
 
 ---
 
@@ -462,7 +464,7 @@ tools/ui_check.py --serial emulator-5554 --apk app/build/outputs/apk/debug/app-d
 ```
 
 `testfixture/` builds about 20 tiny test apps (long names, bright and dark banners) used only by
-these checks. It is never part of Aura itself.
+these checks. It is never part of GlowHome itself.
 
 The built-in artwork, app icon and banner are drawn by code, so there are no image licensing
 questions. To regenerate them:
@@ -495,5 +497,5 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## License
 
-[MIT](LICENSE). Aura TV is an independent project, not affiliated with Amazon, Google or any TV
+[MIT](LICENSE). GlowHome TV is an independent project, not affiliated with Amazon, Google or any TV
 maker. App names and logos shown in screenshots belong to their owners.
