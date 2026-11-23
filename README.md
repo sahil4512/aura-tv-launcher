@@ -5,7 +5,11 @@
 Aura TV replaces your TV's cluttered home screen with one clean row of the apps you actually use.
 It has no ads, no accounts and no tracking. It is built to stay quick on slow, cheap TV chips.
 
-![Aura TV home screen](docs/home.png)
+[![Aura TV in 30 seconds: click to watch the video](docs/aura-promo.gif)](https://github.com/sahil4512/aura-tv-launcher/releases/download/v0.6.6/aura-tv-launcher-promo.mp4)
+
+▶ **[Watch the 30-second video](https://github.com/sahil4512/aura-tv-launcher/releases/download/v0.6.6/aura-tv-launcher-promo.mp4)**
+
+![Aura TV home screen on a Fire TV](docs/home.png)
 
 - **Small and light.** About 1.3 MB to download and about 27 MB of memory while running. It uses
   no CPU while idle on the home screen.
