@@ -11,7 +11,7 @@ It has no ads, no accounts and no tracking. It is built to stay quick on slow, c
 
 On the TV, open the free **Downloader** app and enter the code:
 
-## `1212393`
+## `8015828`
 
 Or type the full address (both always get the newest version):
 
@@ -19,7 +19,7 @@ Or type the full address (both always get the newest version):
 https://github.com/sahil4512/glowhome-tv-launcher/releases/latest/download/GlowHomeTV.apk
 ```
 
-The old address ending in `AuraTV.apk` still works too.
+The old code `1212393` and the old address ending in `AuraTV.apk` still work too.
 
 Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 [Full setup with a computer](#full-setup-with-a-computer)
@@ -92,7 +92,7 @@ https://github.com/sahil4512/glowhome-tv-launcher/releases/latest/download/GlowH
      (If Developer options is missing: My Fire TV → About, select the device name 7 times.)
    - **Android TV / Google TV:** Settings → Apps → Security & restrictions → Unknown sources →
      Downloader → On. (On some TVs: Settings → Device Preferences → Security & restrictions.)
-3. Open Downloader, enter the code **1212393** (or the address above), and choose **Install**
+3. Open Downloader, enter the code **8015828** (or the address above), and choose **Install**
    when it finishes downloading.
 4. Open **GlowHome TV**. It checks your TV and picks the right setup by itself on first start.
 
