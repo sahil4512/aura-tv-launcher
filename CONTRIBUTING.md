@@ -12,5 +12,9 @@ Thanks for helping. A few things keep Aura fast and safe:
   `tools/aura-setup` stops if anything is playing. Please keep it that way.
 - **Never commit signing keys** (`keystore/`) or your own device details (IP addresses, reports).
 
+**Adding TV bloat to the cleanup list** (`tools/cleanup/packages.txt`): one line per package,
+with what it does and what turning it off costs. Only add packages you've turned off on a real TV
+without problems, and put anything that removes a feature under `optional`.
+
 Reporting a problem on a specific TV? Use the "Problem on my TV" issue form and attach the
 `aura-setup` report.

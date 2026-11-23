@@ -1,0 +1,59 @@
+# Packages tools/tv-cleanup may turn off. Only packages actually on the TV are shown.
+# Everything is turned off with `pm disable-user` and can be turned back on with
+# `tools/tv-cleanup <tv-ip>:5555 --restore`. Nothing is ever uninstalled.
+#
+# Format:  tier  package  what it is · what you lose (if anything)
+#
+# Tiers:
+#   safe      background services, ads, telemetry and unused extras. You lose nothing you'd notice.
+#   optional  a feature some people use. Turned off only when you say yes to each one.
+#   home      the TV's own home screen and its recommendation services. Turned off only with
+#             --replace-home, and only when Aura is installed. If Aura doesn't become Home
+#             afterwards, they're turned straight back on.
+#
+# Contributions welcome: add a line per package, with what it does and what turning it off costs.
+# Please only add packages you've turned off on a real TV without problems.
+
+# ---- TCL (Android TV) ----
+safe      com.tcl.bi                                   TCL usage analytics
+safe      com.tcl.common.terminalmanagerplus           TCL telemetry (viewing and device events)
+safe      com.tcl.tv.tclhome_passive                   TCL content push at start-up
+safe      com.tcl.usercenter                           TCL account centre
+safe      com.tcl.tvweishi                             TCL "TV guard" cleaner app
+safe      com.tcl.copydatatotv                         TCL copy-from-phone helper
+safe      com.tcl.keyhelp                              TCL remote-control help screens
+safe      com.tcl.esticker                             TCL in-store demo sticker
+safe      com.tcl.partnercustomizer                    TCL Channel promotional row
+safe      android.autoinstalls.config.tcl.device       auto-installs partner apps after setup
+optional  com.tcl.ui_mediaCenter                       TCL media centre · can't browse USB drives with TCL's app
+optional  com.tcl.videoplayer                          TCL video player · can't play videos from USB with TCL's app
+optional  com.tcl.audioplayer                          TCL music player · can't play music from USB with TCL's app
+optional  com.tcl.imageplayer                          TCL photo viewer · can't view photos from USB with TCL's app
+
+# ---- Google (Android TV) ----
+safe      com.google.android.feedback                  sends feedback reports to Google
+safe      com.google.android.tv.bugreportsender        sends bug reports to Google
+safe      com.google.android.music                     Google Play Music (discontinued)
+safe      com.google.android.videos                    Google Play Movies (discontinued)
+safe      com.google.android.play.games                Google Play Games
+safe      com.google.android.syncadapters.calendar     calendar sync (unused on a TV)
+safe      com.google.android.syncadapters.contacts     contacts sync (unused on a TV)
+safe      com.google.android.inputmethod.pinyin        Chinese Pinyin keyboard
+safe      com.android.printspooler                     printing service
+safe      com.android.wallpaper.livepicker             live wallpaper picker
+safe      com.android.gallery3d                        Gallery app
+optional  com.google.android.katniss                   Google voice search · the remote's mic button stops working
+optional  com.google.android.speech.pumpkin            offline voice commands · voice commands stop working
+optional  com.google.android.apps.mediashell           Chromecast built-in · you can't cast from your phone
+optional  com.google.android.backdrop                  Google's photo screensaver (Backdrop) · use another screensaver, e.g. Aura's
+optional  com.google.android.marvin.talkback           TalkBack screen reader · keep it if you use it
+optional  com.google.android.tts                       text-to-speech voice · TalkBack can't speak
+optional  com.google.android.inputmethod.latin         Gboard keyboard · only if your TV has another keyboard (the one in use is never touched)
+
+# ---- Stock home screens (only with --replace-home) ----
+home      com.google.android.tvlauncher                Google's Android TV home screen
+home      com.google.android.tvrecommendations         recommendations for Google's home screen
+home      com.google.android.leanbacklauncher          older Android TV home screen
+home      com.google.android.leanbacklauncher.recommendations   recommendations for the older home screen
+home      com.google.android.leanbacklauncher.partnerwidget     partner widget on the older home screen
+home      com.google.android.leanbacklauncher.partnercustomizer partner promos on the older home screen

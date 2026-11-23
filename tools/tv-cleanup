@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""
+tv-cleanup: turn off a TV's ads, telemetry and unused preinstalled services, reversibly.
+
+    tools/tv-cleanup <tv-ip>:5555                 # preview only: shows what it would turn off
+    tools/tv-cleanup <tv-ip>:5555 --apply         # turn off the safe ones, ask about each optional one
+    tools/tv-cleanup <tv-ip>:5555 --apply --replace-home   # also turn off the TV's own home screen (Aura must be installed)
+    tools/tv-cleanup <tv-ip>:5555 --restore       # turn everything back on
+
+How it stays safe:
+  - Preview by default. Nothing changes without --apply and your yes.
+  - Packages are turned off with `pm disable-user`, never uninstalled. --restore undoes it, and
+    every run also saves a restore script in reports/.
+  - Only packages in tools/cleanup/packages.txt are touched, each with a note on what you lose.
+  - Never touched: Settings, the system UI, the package installer, Google Play and its services,
+    the keyboard in use, the current home screen (unless --replace-home), and Aura itself.
+  - The TV's home screen is only turned off when Aura then really becomes Home; otherwise it's
+    turned straight back on.
+  - Stops if anything is playing on the TV, like aura-setup.
+Fire TV: Fire OS doesn't let apps turn off Amazon's system apps without root, so there's little
+this can do there; it says so.
+"""
+import argparse
+import datetime
+import importlib.machinery
+import importlib.util
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+_loader = importlib.machinery.SourceFileLoader("aura_setup", os.path.join(HERE, "aura-setup"))
+_spec = importlib.util.spec_from_loader("aura_setup", _loader)
+setup = importlib.util.module_from_spec(_spec)
+_loader.exec_module(setup)
+say, ask, fail = setup.say, setup.ask, setup.fail
+AURA, AURA_HOME = setup.PKG, setup.ACTIVITY
+LIST = os.path.join(HERE, "cleanup", "packages.txt")
+
+NEVER = re.compile(r"^(com\.android\.(settings|systemui|packageinstaller|providers\..*|shell|phone|bluetooth)"
+                   r"|com\.android\.tv\.settings|com\.google\.android\.(gms|gsf|packageinstaller)"
+                   r"|com\.android\.vending|" + re.escape(AURA) + r")$")
+
+
+def load_list():
+    entries = []
+    for line in open(LIST, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        tier, pkg, desc = re.split(r"\s+", line, maxsplit=2)
+        what, _, lose = desc.partition(" · ")
+        entries.append({"tier": tier, "pkg": pkg, "what": what.strip(), "lose": lose.strip()})
+    return entries
+
+
+def packages(tv, flag=""):
+    return {l.split(":", 1)[1].strip() for l in tv.sh(f"pm list packages {flag}").splitlines() if l.startswith("package:")}
+
+
+def current_home(tv):
+    out = tv.sh("cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME")
+    homes = [l.strip() for l in out.splitlines() if re.fullmatch(r"[\w.]+/[\w.$]+", l.strip())]
+    return homes[-1] if homes else ""
+
+
+def disable(tv, pkg):
+    out = tv.sh(f"pm disable-user --user 0 {pkg}")
+    return "disabled-user" in out, out
+
+
+def enable(tv, pkg):
+    out = tv.sh(f"pm enable {pkg}")
+    return "enabled" in out, out
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Turn off a TV's ads, telemetry and unused services (reversible).")
+    ap.add_argument("tv", help="the TV's address, e.g. 192.168.1.50:5555 (or an emulator serial)")
+    ap.add_argument("--apply", action="store_true", help="actually turn things off (default: preview only)")
+    ap.add_argument("--yes", action="store_true", help="don't ask before turning off the safe ones")
+    ap.add_argument("--include-optional", action="store_true", help="also turn off every optional one without asking")
+    ap.add_argument("--replace-home", action="store_true", help="also turn off the TV's own home screen, making Aura Home")
+    ap.add_argument("--restore", action="store_true", help="turn back on everything this tool can turn off")
+    args = ap.parse_args()
+
+    say(f"TV cleanup → {args.tv}\n")
+    tv = setup.connect(args.tv)
+    setup.safety_gate(tv)
+    model = tv.sh("getprop ro.product.model")
+    api = int(tv.sh("getprop ro.build.version.sdk") or 0)
+    fire = tv.sh("getprop ro.product.manufacturer").lower() == "amazon"
+    entries = load_list()
+    disabled = packages(tv, "-d")
+
+    if args.restore:
+        back = [e["pkg"] for e in entries if e["pkg"] in disabled]
+        if not back:
+            say("Nothing to turn back on.")
+            return
+        for p in back:
+            ok, out = enable(tv, p)
+            say(f"   {'✓' if ok else '✗'} {p}" + ("" if ok else f"  ({out})"))
+        say("\nDone. Restart the TV if a turned-on app doesn't appear straight away.")
+        return
+
+    if fire:
+        say("This is a Fire TV. Fire OS doesn't let apps turn off Amazon's system apps without root,\n"
+            "so there's nothing safe to do here. To free space, uninstall apps you don't use in\n"
+            "Settings → Applications → Manage Installed Applications.")
+        return
+
+    enabled = packages(tv, "-e")
+    ime = tv.sh("settings get secure default_input_method").split("/")[0]
+    home = current_home(tv)
+    home_pkg = home.split("/")[0]
+    aura_installed = AURA in packages(tv)
+
+    rows = {"safe": [], "optional": [], "home": []}
+    skipped = []
+    for e in entries:
+        p = e["pkg"]
+        if p not in enabled:
+            continue
+        if NEVER.match(p) or p == ime:
+            skipped.append((p, "needed by the TV (or the keyboard in use)"))
+            continue
+        if e["tier"] == "home":
+            if not args.replace_home:
+                skipped.append((p, "home screen: only with --replace-home"))
+                continue
+            if not aura_installed:
+                skipped.append((p, "home screen: install Aura first (tools/aura-setup)"))
+                continue
+        elif p == home_pkg:
+            skipped.append((p, "it's the current home screen"))
+            continue
+        rows[e["tier"]].append(e)
+
+    say(f"{model} · Android API {api} · home: {home or 'unknown'}\n")
+    labels = {"safe": "Safe to turn off (you lose nothing you'd notice)",
+              "optional": "Optional (you lose a feature: asked one by one)",
+              "home": "Home screen (replaced by Aura)"}
+    total = 0
+    for tier in ("safe", "optional", "home"):
+        if not rows[tier]:
+            continue
+        say(labels[tier])
+        for e in rows[tier]:
+            say(f"   {e['pkg']:<46} {e['what']}" + (f"\n   {'':<46} → {e['lose']}" if e["lose"] else ""))
+            total += 1
+        say()
+    if skipped:
+        say("Left alone")
+        for p, why in skipped:
+            say(f"   {p:<46} {why}")
+        say()
+    if not total:
+        say("Nothing to turn off: this TV is already clean (or its packages aren't on the list yet).")
+        return
+    if not args.apply:
+        say("Preview only: nothing was changed. Add --apply to turn these off (you'll be asked first).")
+        return
+
+    chosen = list(rows["safe"])
+    if chosen and not args.yes and not ask(f"Turn off the {len(chosen)} safe ones?", True):
+        chosen = []
+    for e in rows["optional"]:
+        if args.include_optional or ask(f"Turn off {e['what']}? ({e['lose']})", False):
+            chosen.append(e)
+    home_rows = rows["home"]
+    if home_rows and not args.yes and not ask("Turn off the TV's own home screen and make Aura Home?", False):
+        home_rows = []
+    if not chosen and not home_rows:
+        say("Nothing was changed.")
+        return
+
+    setup.safety_gate(tv)
+    done = []
+    if chosen:
+        say("\nTurning off")
+    for e in chosen:
+        ok, out = disable(tv, e["pkg"])
+        say(f"   {'✓' if ok else '✗'} {e['pkg']}" + ("" if ok else f"  (refused: {out})"))
+        if ok:
+            done.append(e["pkg"])
+
+    if home_rows:
+        say("\nReplacing the home screen")
+        off = []
+        for e in home_rows:
+            ok, out = disable(tv, e["pkg"])
+            if ok:
+                off.append(e["pkg"])
+        tv.sh(f"cmd package set-home-activity {AURA_HOME}")
+        now = current_home(tv)
+        if now == AURA_HOME:
+            say(f"   ✓ Aura is now Home ({len(off)} home-screen packages turned off)")
+            done += off
+        else:
+            for p in off:
+                enable(tv, p)
+            say(f"   ✗ Aura didn't become Home (Home is {now or 'unknown'}), so the home screen was turned back on.")
+
+    # restore script
+    os.makedirs(os.path.join(os.path.dirname(HERE), "reports"), exist_ok=True)
+    name = re.sub(r"[^A-Za-z0-9]+", "-", model).strip("-") or "tv"
+    path = os.path.join(os.path.dirname(HERE), "reports", f"{name}-cleanup-{datetime.date.today()}.sh")
+    new = not os.path.exists(path)
+    with open(path, "a") as f:  # several runs on one day add to the same restore script
+        if new:
+            f.write("#!/bin/sh\n# Turns back on what tools/tv-cleanup turned off. Usage: sh this-file <tv-ip>:5555\n")
+            f.write('DEV="$1"; [ -n "$DEV" ] || { echo "usage: $0 <tv-ip>:5555"; exit 1; }\n')
+        for p in done:
+            f.write(f'adb -s "$DEV" shell pm enable {p}\n')
+    os.chmod(path, 0o755)
+    say(f"\nTurned off {len(done)} packages. Restart the TV to free the memory they used.")
+    say(f"To undo: tools/tv-cleanup {args.tv} --restore   (or run {os.path.relpath(path, os.getcwd())})")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        say("\nStopped.")
+        sys.exit(1)

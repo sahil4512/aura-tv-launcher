@@ -42,6 +42,7 @@ Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 - [Which TVs it works on](#which-tvs-it-works-on)
 - [Install it on your TV](#install-it-on-your-tv)
 - [Make Aura your home screen](#make-aura-your-home-screen)
+- [Clean up your TV (optional)](#clean-up-your-tv-optional)
 - [Using Aura](#using-aura)
 - [Settings](#settings)
 - [How Aura stays fast](#how-aura-stays-fast)
@@ -211,6 +212,48 @@ off, and has loop protection (it pauses itself if it ever redirects too often).
 accessibility service to catch the Home button itself, which removes the 5-second delay. Most
 Fire OS versions block this, so it may do nothing on your TV. If it does work, holding Home opens
 Amazon Home.
+
+---
+
+## Clean up your TV (optional)
+
+Many TVs ship with services you never asked for: usage tracking, ad and promo rows, partner apps
+installed after setup, and extras like discontinued Google apps. On a slow TV they use memory and
+CPU in the background. `tools/tv-cleanup` turns them off.
+
+```bash
+tools/tv-cleanup <tv-ip>:5555
+```
+
+On its own it's only a **preview**: it lists what it would turn off on *your* TV, and what each
+one does. Nothing changes until you add `--apply`:
+
+```bash
+tools/tv-cleanup <tv-ip>:5555 --apply
+```
+
+- **Safe** ones (telemetry, promos, unused extras) are turned off after one yes.
+- **Optional** ones cost a feature, so you're asked about each, for example *"Google voice search:
+  the remote's mic button stops working"* or *"Chromecast built-in: you can't cast"*.
+- **The TV's own home screen** is only turned off with `--replace-home`, and only if Aura then
+  really becomes Home. If it doesn't, it's turned straight back on.
+- **Never touched:** Settings, the system UI, Google Play and its services, the keyboard you use,
+  and anything not on the [reviewed list](tools/cleanup/packages.txt).
+
+Everything is **turned off, not uninstalled**. To undo all of it:
+
+```bash
+tools/tv-cleanup <tv-ip>:5555 --restore
+```
+
+Each run also saves a restore script in `reports/`. Restart the TV afterwards to free the memory.
+
+On **Fire TV**, Fire OS doesn't let apps turn off Amazon's system apps without root, so the tool
+just says so. There, uninstall apps you don't use in Settings → Applications.
+
+The list currently covers TCL and Google's Android TV packages, all turned off on a real TCL TV.
+Know another brand's bloat? Add it to [packages.txt](tools/cleanup/packages.txt) with what it
+does and what turning it off costs, and open a pull request.
 
 ---
 
@@ -430,7 +473,7 @@ app/src/main/java/com/auratv/launcher/
   util/                       start-up timing, small helpers
 app/src/test/                 unit tests
 testfixture/                  test apps for the emulator checks
-tools/                        aura-setup, test harnesses, TV monitor, artwork generator
+tools/                        aura-setup, tv-cleanup (+ cleanup/packages.txt), test harnesses, TV monitor, artwork generator
 docs/                         screenshots and measurement reports
 ```
 
