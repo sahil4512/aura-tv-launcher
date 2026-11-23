@@ -118,7 +118,11 @@ class ConfirmOverlay(
     private val heading: String,
     private val message: String,
     private val choices: List<Pair<String, () -> Unit>>,
+    /** Runs whenever the card closes: after a choice, or on Back. */
+    private val onDismissed: () -> Unit = {},
 ) : Overlay(activity) {
+
+    override fun onClosed() = onDismissed()
 
     private val rows = ArrayList<MenuRow>()
 

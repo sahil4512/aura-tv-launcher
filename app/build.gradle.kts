@@ -15,8 +15,8 @@ android {
         // the primary target (Fire TV Stick 4K, Fire OS 6) is API 25.
         minSdk = 22
         targetSdk = 34
-        versionCode = 17
-        versionName = "0.6.6"
+        versionCode = 18
+        versionName = "0.6.7"
         // Fire TV Stick 4K is armeabi-v7a, but there is no native code, so the APK is ABI-neutral.
     }
 

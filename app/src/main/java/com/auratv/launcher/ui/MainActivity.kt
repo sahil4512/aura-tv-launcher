@@ -30,6 +30,8 @@ import com.auratv.launcher.apps.AppEntry
 import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.apps.AppRepository
 import com.auratv.launcher.apps.RecentApps
+import com.auratv.launcher.redirect.DefaultHome
+import com.auratv.launcher.redirect.DefaultHomePolicy
 import com.auratv.launcher.redirect.HomeRedirect
 import com.auratv.launcher.apps.TileCache
 import com.auratv.launcher.settings.Prefs
@@ -158,6 +160,80 @@ class MainActivity : Activity() {
         // The Home-button service lives in its own process; (re)apply the saved configuration.
         HomeRedirect.apply(this, prefs)
         noteRedirectArrival(intent)
+        // First start: offer to make Aura the Home app, once Home has drawn and settled.
+        Bg.main.postDelayed(homePrompt, HOME_PROMPT_DELAY_MS)
+    }
+
+    // =====================================================================
+    // "Make Aura your home screen" (first start, and Settings → System)
+    // =====================================================================
+
+    private var homePromptTries = 0
+    /** The prompt is waiting for Aura's window to get focus back (e.g. from a permission dialog). */
+    private var homePromptPending = false
+
+    private val homePrompt = Runnable { maybeOfferDefaultHome() }
+
+    /**
+     * A system Home step (role dialog, Home settings, chooser) was started and Aura hasn't checked the
+     * outcome yet. Kept in prefs: Android starts a new Aura activity when Aura becomes the Home app.
+     */
+    private var homeStepStarted: Boolean
+        get() = prefs.sp.getBoolean("home_step_started", false)
+        set(v) { prefs.sp.edit().putBoolean("home_step_started", v).apply() }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) return
+        if (homePromptPending) {
+            homePromptPending = false
+            Bg.main.postDelayed(homePrompt, 800)
+        }
+        // Back from the system step. (Aura is singleTask, so onActivityResult isn't reliable: check directly.)
+        if (homeStepStarted) {
+            homeStepStarted = false
+            val home = DefaultHome.isAuraHome(this)
+            Log.i(TAG, "home step finished, Aura is Home: $home")
+            if (home) toast("Aura is now your home screen")
+            (overlays.lastOrNull() as? SettingsPanel)?.reload()
+        }
+    }
+
+    private fun maybeOfferDefaultHome() {
+        if (isFinishing || isDestroyed || prefs.homePromptAnswered) return
+        // Another window (a permission dialog) is in front: ask once it is gone.
+        if (!hasWindowFocus()) { homePromptPending = true; return }
+        // One of Aura's own overlays is open: try again shortly.
+        if (overlays.isNotEmpty()) {
+            if (++homePromptTries < 150) Bg.main.postDelayed(homePrompt, 2_000)
+            return
+        }
+        val route = DefaultHome.route(this)
+        Log.i(TAG, "home prompt: route $route")
+        if (DefaultHomePolicy.shouldPromptOnStart(prefs.homePromptAnswered, route)) offerDefaultHome(route, firstStart = true)
+    }
+
+    /** Explains and starts the best way this TV allows to make Aura the Home app. */
+    fun offerDefaultHome(route: DefaultHomePolicy.Route = DefaultHome.route(this), firstStart: Boolean = false) {
+        val p = DefaultHomePolicy.prompt(route)
+        val choices = ArrayList<Pair<String, () -> Unit>>()
+        p.goLabel?.let { label -> choices += label to { goDefaultHome(route) } }
+        choices += (if (p.goLabel == null) "OK" else "Not now") to {}
+        // Any answer (a choice or Back) counts: the first-start prompt is never shown again.
+        openOverlay(ConfirmOverlay(this, p.heading, p.message, choices,
+            onDismissed = { if (firstStart) prefs.homePromptAnswered = true }))
+    }
+
+    private fun goDefaultHome(route: DefaultHomePolicy.Route) {
+        if (route == DefaultHomePolicy.Route.FIRE_TV) {
+            val s = SettingsPanel(this)
+            openOverlay(s)
+            s.openHomeButton()
+        } else if (DefaultHome.start(this, route, REQ_HOME_ROLE)) {
+            homeStepStarted = true
+        } else {
+            offerDefaultHome(DefaultHomePolicy.Route.COMPUTER)
+        }
     }
 
     override fun onStart() {
@@ -216,8 +292,9 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Asks once (Android's own prompt) for the permission Android 8.1+ requires to read the Wi-Fi
-     * network's name. Aura uses it for nothing else; declining just keeps the chip saying "Wi-Fi".
+     * Asks once for the permission Android 8.1+ requires to read the Wi-Fi network's name. Android's
+     * own dialog only says "location", so Aura first explains why and that saying no is fine.
+     * Aura uses it for nothing else; declining just keeps the chip saying "Wi-Fi".
      */
     private fun askForWifiNameOnce() {
         if (Build.VERSION.SDK_INT < 27 || overlays.isNotEmpty()) return
@@ -225,13 +302,17 @@ class MainActivity : Activity() {
         if (checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED) return
         if (prefs.sp.getBoolean("asked_wifi_name", false)) return
         prefs.sp.edit().putBoolean("asked_wifi_name", true).apply()
-        try { requestPermissions(arrayOf(perm), REQ_WIFI_NAME) } catch (_: Exception) {}
+        openOverlay(ConfirmOverlay(this, WIFI_NAME_HEADING, WIFI_NAME_MESSAGE, listOf(
+            "Continue" to { try { requestPermissions(arrayOf(perm), REQ_WIFI_NAME) } catch (_: Exception) {} },
+            "Skip" to {},
+        )))
     }
 
     override fun onDestroy() {
         repo.removeListener(appsListener)
         // Bg.main outlives the activity: a pending hourly tick would keep this instance alive after recreate().
         Bg.main.removeCallbacks(greetingTick)
+        Bg.main.removeCallbacks(homePrompt)
         super.onDestroy()
     }
 
@@ -1233,5 +1314,12 @@ class MainActivity : Activity() {
         private const val IDLE_MOTION_PAUSE_MS = 45_000L
         private const val REQ_STORAGE = 7
         private const val REQ_WIFI_NAME = 8
+        private const val REQ_HOME_ROLE = 9
+        private const val HOME_PROMPT_DELAY_MS = 1_500L
+        const val WIFI_NAME_HEADING = "Show your Wi-Fi name?"
+        const val WIFI_NAME_MESSAGE = "Android asks for location permission before any app can read the name of " +
+            "your Wi-Fi network. Aura needs it only to show your Wi-Fi name on Home and never uses your location.\n" +
+            "If you'd rather not, choose Skip, or \u201cDon't allow\u201d on the next screen. Aura works the same; " +
+            "the chip just says \u201cWi-Fi\u201d."
     }
 }

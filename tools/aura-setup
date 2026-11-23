@@ -393,7 +393,7 @@ def main():
         tv.sh(f"appops set {PKG} GET_USAGE_STATS allow")
         extras.append("Usage access granted. Turn the redirect on in Aura: Settings → System → Home Button.")
     if not info["fire_os"] and info["api"] >= 24 and \
-            (args.set_home or ask("   Make Aura the Home app?", False)):
+            (args.set_home or ask("   Make Aura the Home app?", sys.stdin.isatty())):
         out = tv.sh(f"cmd package set-home-activity {ACTIVITY}")
         extras.append(("Aura is now the Home app." if "Success" in out or not out else f"Setting Home failed: {out}")
                       + f" To undo: adb -s {tv.serial} shell cmd package set-home-activity {info['home']}")

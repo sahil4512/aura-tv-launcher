@@ -229,6 +229,7 @@ def seed(d, fav_count=13, history=""):
         ("string", "theme", "midnight"), ("int", "accent", "0"), ("boolean", "clock", "true"),
         ("int", "clock_format", "0"), ("int", "icon_size", "1"), ("boolean", "apps_row", "false"),
         ("int", "wp_rotate_min", "0"), ("boolean", "home_grid", "false"),
+        ("boolean", "home_prompt_answered", "true"),
     ]:
         xml = set_pref(xml, kind, name, val)
     d.write_prefs(xml)

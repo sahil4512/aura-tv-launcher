@@ -53,6 +53,7 @@ def configure(d, enabled):
     xml = set_pref(xml, "boolean", "redirect_enabled", "true" if enabled else "false")
     xml = set_pref(xml, "string", "redirect_test_home", TEST_HOME)
     xml = set_pref(xml, "boolean", "motion_cinematic", "false")
+    xml = set_pref(xml, "boolean", "home_prompt_answered", "true")
     d.write_prefs(xml)
     d.start(6)  # MainActivity.onCreate -> HomeRedirect.apply
 

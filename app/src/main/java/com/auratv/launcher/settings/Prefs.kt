@@ -76,6 +76,8 @@ class Prefs(context: Context) {
     var knownApps by list("known_apps")
 
     var videoWarningShown by bool("video_warning_shown", false)
+    /** The first-start "Make Aura your home screen" prompt was answered (or dismissed) once. */
+    var homePromptAnswered by bool("home_prompt_answered", false)
 
     fun hiddenSet(): Set<String> = hidden.toHashSet()
 

@@ -22,6 +22,7 @@ import android.widget.TextView
 import com.auratv.launcher.BuildConfig
 import com.auratv.launcher.R
 import com.auratv.launcher.apps.AppOrdering
+import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.HomeRedirect
 import com.auratv.launcher.settings.AuraTheme
 import com.auratv.launcher.settings.Prefs
@@ -180,6 +181,14 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         stack.clear()
         stack.add(sections[i].page())
         render(focusFirst = false)
+    }
+
+    /** Opens System → Home Button directly (from the first-start prompt on Fire TV). */
+    fun openHomeButton() {
+        val i = sections.indexOfFirst { it.title == "System" }
+        if (i < 0) return
+        showSection(i)
+        push(homeButtonPage())
     }
 
     private fun push(page: Page) {
@@ -634,6 +643,8 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         val fire = HomeRedirect.isFireOs(ctx)
         items += Action(if (fire) "Fire TV Settings" else "TV Settings", "Network, picture, sound, apps…") { activity.openSystemSettings() }
         if (fire) items += Nav("Home Button", { homeButtonSummary() }) { push(homeButtonPage()) }
+        else items += Action("Make Aura Your Home Screen",
+            if (DefaultHome.isAuraHome(ctx)) "Done: the Home button opens Aura" else "So the Home button opens Aura") { activity.offerDefaultHome() }
         items += Toggle("Keep the TV Light", "When you open an app, close other apps running in the background",
             { p.keepTvLight }, { p.keepTvLight = it })
         items += Section("Backup")
@@ -663,12 +674,7 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         val items = ArrayList<Item>()
         if (!HomeRedirect.isFireOs(ctx)) {
             items += Info("This device lets you choose Aura as the Home app directly.", "")
-            items += Action("Open Home App Settings") {
-                try {
-                    ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                } catch (_: Exception) { activity.toast("Not available") }
-            }
+            items += Action("Make Aura Your Home Screen") { activity.offerDefaultHome() }
             return@Page items
         }
         val hijack = HomeRedirect.installedHijack(ctx)

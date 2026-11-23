@@ -148,7 +148,7 @@ and select OK. Then `aura-setup`:
 4. **Installs** the newest APK from `dist/`. It never uninstalls or disables anything else.
 5. **Precompiles** Aura so it opens faster (Android 7 and newer).
 6. **Asks about the optional steps:** usage access for the Fire TV Home button, or making Aura the
-   Home app on Android TV. Nothing happens without your yes.
+   Home app on Android TV (just press Enter: the answer defaults to yes). Nothing happens without your yes.
 7. **Measures** launch time, memory, idle CPU and stutter, and saves a report in `reports/`.
    If something isn't right on your TV, attach that report to a GitHub issue.
 
@@ -174,15 +174,29 @@ adb -s <tv-ip>:5555 shell cmd package compile -m speed -f com.auratv.launcher
 
 ### Android TV / Google TV
 
-Press **Home** on the remote. If the TV asks which app to use, pick **Aura TV** and *Always*.
+**Aura asks you itself.** The first time you open it, Aura shows *Make Aura your home screen* and
+does the most your TV allows. Android never lets an app make itself the home screen without you,
+so you confirm once:
 
-Some TVs never ask, because the maker locked the home screen. On those, Aura still works as a
-normal app: open it from the app list and keep it as your starting point.
+- **Android 10 and newer:** select *Make Aura my home screen*. In the TV's own dialog, select **Aura TV**, then *Set as default*.
+- **Older Android TV:** Aura opens the TV's Home app settings, or the "which app?" chooser.
+  Pick **Aura TV** (and *Always*).
+- **TVs that never let you choose** (stock Google TV launchers that always win, and TVs whose maker
+  locked the home screen): Aura says so and shows the one command that does it from a computer:
+  ```bash
+  tools/aura-setup <tv-ip>:5555 --set-home
+  ```
+  or, to also turn the TV's own home screen off (reversible): `tools/tv-cleanup <tv-ip>:5555 --apply --replace-home`.
+
+*Not now* is remembered, and the prompt never comes back on its own. To do it later:
+Aura **Settings → System → Make Aura Your Home Screen**. Until then Aura works as a normal app:
+open it from the app list.
 
 ### Fire TV
 
 Fire OS doesn't let you change the home screen. Pressing Home always starts Amazon Home first.
-Aura has a **built-in Home button redirect** that brings Aura up instead. It is off until you
+Aura has a **built-in Home button redirect** that brings Aura up instead. On first start Aura
+explains this and can take you straight to its Home Button settings. The redirect is off until you
 turn it on:
 
 1. Give Aura permission to see which app is on screen (one time, from your computer; `aura-setup`
@@ -294,7 +308,7 @@ chosen screensaver.
 | **Appearance** | 5 themes (Midnight, Minimal Dark, Soft Glass, Cinematic, Warm Ambient), accent colour, clock and date, 12/24-hour, greeting, background (Solid or Ambient glow) |
 | **Apps** | Favourites, hidden apps, auto-add new apps, show system utilities, All Apps order, refresh app list, reset favourites |
 | **Layout** | One favourites row or an All Apps grid, tile size, row position, Recently Used row, extra All Apps row, animation speed (Relaxed / Normal / Quick / Off) |
-| **System** | TV settings shortcut, Home Button (Fire TV only), **Keep the TV Light**, backup / restore, reset |
+| **System** | TV settings shortcut, Make Aura Your Home Screen (Android TV) or Home Button (Fire TV), **Keep the TV Light**, backup / restore, reset |
 | **About** | Version, your TV model, how long Home took to start, memory in use, and how Aura tuned itself for this TV |
 
 **Keep the TV Light** (on by default): a few seconds after you open an app from Aura, Aura closes

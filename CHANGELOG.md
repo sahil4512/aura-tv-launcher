@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.7 — Aura asks to become your home screen (2026-11-23)
+
+versionCode 18.
+
+- **First start: "Make Aura your home screen".** Android never lets an app make itself the Home app, so Aura asks once and does the most each TV allows:
+  - **Android 10+:** Android's own dialog (`RoleManager`, `ROLE_HOME`): select Aura TV, then Set as default.
+  - **Older Android TV:** the TV's Home app settings (`ACTION_HOME_SETTINGS`), or Android's "which app?" chooser.
+  - **TVs where nothing on the TV works** (Google's stock TV launcher has a priority-2 Home filter that always wins): Aura says so plainly and shows the computer command, `tools/aura-setup <tv-ip>:5555 --set-home` or `tools/tv-cleanup … --replace-home`.
+  - **Fire TV:** no Home app can be chosen. Aura explains this and opens its own Settings → System → Home Button.
+  - Shown only when Aura isn't already Home. *Not now* (or Back) is remembered. If an Android dialog is in front (such as the Wi-Fi permission), the prompt waits for it.
+- **Aura checks the result itself** when the viewer comes back, and says "Aura is now your home screen". It reads the Home role on Android 10+ and declares a HOME `<queries>` entry, so Android 11+ package visibility can't hide the other launcher.
+- **Settings → System → Make Aura Your Home Screen** offers it again at any time (Android TV; Fire TV keeps Home Button).
+- **Wi-Fi name permission explained first.** Before Android's "location" dialog, Aura says it needs the permission only to show the Wi-Fi network's name, never uses the location, and that Skip / Don't allow is fine (the chip then says "Wi-Fi").
+- **`tools/aura-setup`:** "Make Aura the Home app?" now defaults to yes (press Enter). Without a terminal it still changes nothing.
+- **Tests:** `DefaultHomePolicyTest` (route choice, show-once rule, prompt texts); unit tests 75/75. Emulators (`aura_androidtv` API 31, `aura_api25` API 25): the prompt shows on first start, waits behind the Wi-Fi dialog, remembers *Not now*, stays away when Aura is Home, and is offered again from Settings → System. On API 31, Android's "Set Aura TV as your default home app?" dialog made Aura hold the Home role, and the Home key opened Aura. On API 25, Aura opened the Home app settings. Home and Settings UI checks: 54/54 on both. Not yet tried on a real TV.
+
 ## 0.6.6 — simpler settings, TV settings one press away, tuned per TV (2026-11-08)
 
 versionCode 17.
