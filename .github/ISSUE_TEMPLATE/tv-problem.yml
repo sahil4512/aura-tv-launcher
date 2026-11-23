@@ -1,0 +1,27 @@
+name: Problem on my TV
+description: Aura doesn't work right, or is slow, on a TV
+labels: [tv-report]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Setup report
+      description: |
+        Run `tools/aura-setup <tv-ip>:5555 --check-only` (or a full setup) and paste the report
+        from `reports/` here. It lists the TV model, Android version, memory and CPU; it contains
+        no personal data, but check it before posting.
+      render: markdown
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Aura version
+      description: Settings → About → Version

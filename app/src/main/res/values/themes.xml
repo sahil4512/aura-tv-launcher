@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Aura" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:colorBackground">#07090F</item>
+        <item name="android:colorAccent">#8FB8FF</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowDisablePreview">false</item>
+        <item name="android:windowShowWallpaper">false</item>
+    </style>
+</resources>

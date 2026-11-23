@@ -1,0 +1,429 @@
+#!/usr/bin/env python3
+"""
+aura-setup: point Aura TV at a TV and it checks, installs, tunes, precompiles and measures.
+
+    tools/aura-setup <tv-ip>:5555                 # full setup (asks before installing)
+    tools/aura-setup <tv-ip>:5555 --check-only    # just look at the TV and say what would happen
+
+Steps:
+  1. Connect, and stop at once if something is playing or an app other than the home screen
+     or Settings is open (never interrupts what you're watching).
+  2. Look at the TV (read-only): model, OS, Android version, memory, CPU, GPU, screen, current
+     home app, installed Aura version.
+  3. Say which setup Aura will use on it (Light or Standard) and why, and what will be done.
+  4. Install the newest APK from dist/ (or --apk). Nothing else is ever uninstalled or disabled.
+  5. Precompile all of Aura's code (Android 7+), which makes it open about 20 % faster on slow chips.
+  6. Optional, only with your yes: usage access for the Fire TV Home button, or Aura as Home on
+     Android TV.
+  7. Measure launch time, memory, idle CPU and stutter, and write reports/<model>-<date>.md.
+
+Only the Python 3 standard library and adb are needed.
+"""
+import argparse
+import datetime
+import glob
+import os
+import re
+import subprocess
+import sys
+import time
+
+PKG = "com.auratv.launcher"
+ACTIVITY = f"{PKG}/.ui.MainActivity"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Screens on which it's safe to start working: home screens, Settings, Aura itself.
+SAFE_FOREGROUND = re.compile(r"launcher|home|tvlauncher|settings|" + re.escape(PKG), re.I)
+PLAYING = re.compile(r"state=3, position=[0-9-]+, buffered position=[0-9-]+, speed=1\.0")
+
+
+class Tv:
+    def __init__(self, serial):
+        self.serial = serial
+
+    def adb(self, *args, timeout=60):
+        r = subprocess.run(["adb", "-s", self.serial, *args], capture_output=True, text=True,
+                           timeout=timeout, errors="replace")
+        return (r.stdout + r.stderr).replace("\r", "")
+
+    def sh(self, cmd, timeout=60):
+        return self.adb("shell", cmd, timeout=timeout).strip()
+
+
+def say(msg=""):
+    print(msg, flush=True)
+
+
+def ask(question, assume):
+    """Yes/no prompt. Without a terminal, the answer is `assume`."""
+    if not sys.stdin.isatty():
+        return assume
+    a = input(f"{question} [{'Y/n' if assume else 'y/N'}] ").strip().lower()
+    return assume if not a else a.startswith("y")
+
+
+def fail(msg):
+    say(f"\n✗ {msg}")
+    sys.exit(1)
+
+
+# ---------------------------------------------------------------- 1. connect and safety gate
+
+def connect(serial):
+    if subprocess.run(["which", "adb"], capture_output=True).returncode != 0:
+        fail("adb not found. Install Android platform-tools first (see README).")
+    if ":" in serial:
+        out = subprocess.run(["adb", "connect", serial], capture_output=True, text=True).stdout
+        if "connected" not in out:
+            fail(f"Could not connect to {serial}: {out.strip()}\n  Check the IP, that ADB debugging is on, "
+                 "and that this computer is on the same network.")
+    tv = Tv(serial)
+    state = tv.adb("get-state").strip()
+    if "unauthorized" in state:
+        fail("The TV is asking 'Allow USB debugging?'. Choose 'Always allow' on the TV, then run this again.")
+    if state != "device":
+        fail(f"TV not ready ({state}).")
+    return tv
+
+
+def foreground_package(tv):
+    out = tv.sh("dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' | head -3")
+    m = re.search(r"u0 ([\w.]+)/", out)
+    return m.group(1) if m else ""
+
+
+def safety_gate(tv):
+    """Hard gate: exit before changing anything if the TV is in use."""
+    if PLAYING.search(tv.sh("dumpsys media_session")):
+        fail("Something is playing on the TV. Nothing was changed. Run this again when it's idle.")
+    fg = foreground_package(tv)
+    if fg and not SAFE_FOREGROUND.search(fg):
+        fail(f"'{fg}' is open on the TV. Nothing was changed. Go to the TV's home screen and run this again.")
+    return fg
+
+
+# ---------------------------------------------------------------- 2. inspect (read-only)
+
+PROBE = r"""
+for p in ro.product.manufacturer ro.product.model ro.product.device ro.build.version.release \
+         ro.build.version.sdk ro.product.cpu.abi ro.config.low_ram ro.build.version.name; do
+  echo "$p=$(getprop $p)"; done
+echo "memkb=$(grep MemTotal /proc/meminfo | tr -s ' ' | cut -d' ' -f2)"
+echo "cores=$(ls -d /sys/devices/system/cpu/cpu[0-9]* | wc -l)"
+echo "maxkhz=$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq 2>/dev/null | sort -n | tail -1)"
+echo "size=$(wm size | tail -1 | sed 's/.*: //')"
+echo "density=$(wm density | tail -1 | sed 's/.*: //')"
+echo "gles=$(dumpsys SurfaceFlinger | grep -m1 GLES | sed 's/^ *//')"
+echo "features=$(pm list features | grep -E 'leanback|fire_tv|amazon' | tr '\n' ' ')"
+echo "aura=$(dumpsys package com.auratv.launcher | grep -m1 versionName | sed 's/.*=//')"
+echo "data=$(df /data | tail -1 | tr -s ' ')"
+"""
+
+
+def inspect(tv):
+    info = {}
+    for line in tv.sh(PROBE, timeout=90).splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            info[k.strip()] = v.strip()
+    info["api"] = int(info.get("ro.build.version.sdk") or 0)
+    info["mem_mb"] = int(info.get("memkb") or 0) // 1024
+    info["max_mhz"] = int(info.get("maxkhz") or 0) // 1000
+    info["cores"] = int(info.get("cores") or 0)
+    info["low_ram"] = info.get("ro.config.low_ram") == "true"
+    info["emulator"] = tv.serial.startswith("emulator-") or "sdk" in info.get("ro.product.model", "").lower()
+    feats = info.get("features", "")
+    info["fire_os"] = info.get("ro.product.manufacturer", "").lower() == "amazon" or "fire_tv" in feats
+    info["os"] = ("Fire OS" if info["fire_os"] else "Android TV" if "leanback" in feats else "Android") + \
+        f" (Android {info.get('ro.build.version.release', '?')}, API {info['api']})"
+    if info["api"] >= 24:
+        out = tv.sh("cmd package resolve-activity --brief -a android.intent.action.MAIN "
+                    "-c android.intent.category.HOME")
+        homes = [l.strip() for l in out.splitlines() if re.fullmatch(r"[\w.]+/[\w.$]+", l.strip())]
+        info["home"] = homes[-1] if homes else "(asks each time)"
+    else:
+        info["home"] = "unknown on this Android version"
+    gles = re.search(r"OpenGL ES ([\d.]+)", info.get("gles", ""))
+    info["gles_short"] = f"OpenGL ES {gles.group(1)}" if gles else "unknown"
+    return info
+
+
+def tier(info):
+    """The same rule Aura's DeviceProfile applies inside the app on its first start."""
+    why = []
+    if info["low_ram"]:
+        why.append("Android low-RAM mode")
+    if 0 < info["mem_mb"] < 2048:
+        why.append(f"{info['mem_mb']} MB memory (under 2 GB)")
+    if 0 < info["max_mhz"] <= 1200:
+        why.append(f"CPU at {info['max_mhz']} MHz (1.2 GHz or less)")
+    return ("Light", why) if why else ("Standard", ["enough memory and CPU speed"])
+
+
+# ---------------------------------------------------------------- 4–5. install and precompile
+
+def find_apk(given, required=True):
+    if given:
+        if not os.path.isfile(given):
+            fail(f"APK not found: {given}")
+        return given
+
+    def ver(p):
+        return [int(x) for x in re.findall(r"\d+", os.path.basename(p))]
+    found = sorted(glob.glob(os.path.join(ROOT, "dist", "AuraTV-*.apk")), key=ver)
+    if found:
+        return found[-1]
+    built = os.path.join(ROOT, "app/build/outputs/apk/release/app-release.apk")
+    if os.path.isfile(built):
+        return built
+    if not required:
+        return None
+    fail("No APK found. Download AuraTV-x.y.z.apk from the GitHub Releases page into dist/, "
+         "build one (./gradlew assembleRelease), or pass --apk.")
+
+
+def install(tv, apk):
+    out = tv.adb("install", "-r", apk, timeout=300)
+    if "Success" in out:
+        return
+    if "UPDATE_INCOMPATIBLE" in out or "signatures do not match" in out:
+        fail("The Aura already on this TV was signed with a different key, so it can't be updated in place.\n"
+             f"  Uninstall it first (this resets Aura's settings): adb -s {tv.serial} uninstall {PKG}")
+    if "VERSION_DOWNGRADE" in out:
+        fail("The TV has a newer Aura than this APK. Use a newer APK, or uninstall first.")
+    fail(f"Install failed:\n{out}")
+
+
+def precompile(tv, api):
+    if api < 24:
+        return "not needed: Android 5–6 compile apps fully at install"
+    out = tv.sh(f"cmd package compile -m speed -f {PKG}", timeout=300)
+    if "Success" not in out:
+        return f"failed: {out}"
+    sect = tv.sh(f"dumpsys package dexopt | grep -A6 '\\[{PKG}\\]'")
+    f = re.search(r"compilation_filter=([\w-]+)", sect) or re.search(r"status=([\w-]+)", sect)
+    return f"done ({f.group(1) if f else 'speed'})"
+
+
+# ---------------------------------------------------------------- 7. measure
+
+def pid_of(tv):
+    out = tv.sh(f"pidof {PKG}") or tv.sh(f"ps | grep ' {PKG}$' | tr -s ' ' | cut -d' ' -f2")
+    return out.split()[0] if out.split() else ""
+
+
+def ready_to_measure(tv, wait_s=90):
+    """Measuring restarts Aura and presses arrow keys, so only do it while Aura is on screen and
+    nothing plays. On a first install Aura asks for the Wi-Fi name permission: wait for an answer."""
+    asked = False
+    for _ in range(wait_s // 3):
+        if PLAYING.search(tv.sh("dumpsys media_session")):
+            return "something started playing on the TV"
+        fg = foreground_package(tv)
+        if fg == PKG:
+            return None
+        if "permission" in fg or "packageinstaller" in fg:
+            if not asked:
+                say("   Aura is asking on the TV whether it may show the Wi-Fi name. Answer it with the remote…")
+                asked = True
+            time.sleep(3)
+            continue
+        return f"'{fg}' is on screen instead of Aura"
+    return "the question on the TV wasn't answered"
+
+
+def measure(tv):
+    m = {"launch_ms": [], "warm_ms": []}
+    for _ in range(3):
+        # Like a real cold start: Aura in the background (TV Settings in front), its process gone.
+        tv.sh("am start -a android.settings.SETTINGS")
+        time.sleep(2)
+        for _ in range(3):  # Android 7 can restart a force-stopped app at once; stop until it's gone
+            tv.sh(f"am force-stop {PKG}")
+            time.sleep(0.5)
+            if not pid_of(tv):
+                break
+        cold = not pid_of(tv)
+        out = tv.sh(f"am start -W -n {ACTIVITY}", timeout=60)
+        t = re.search(r"TotalTime: (\d+)", out)
+        if t:
+            m["launch_ms" if cold else "warm_ms"].append(int(t.group(1)))
+        time.sleep(3)
+    time.sleep(3)
+
+    mem = tv.sh(f"dumpsys meminfo {PKG}")
+    t = re.search(r"TOTAL PSS:\s+(\d+)", mem) or re.search(r"^\s*TOTAL\s+(\d+)", mem, re.M)
+    m["pss_mb"] = round(int(t.group(1)) / 1024, 1) if t else None
+
+    pid = pid_of(tv)
+    if pid:
+        def ticks():
+            f = tv.sh(f"cat /proc/{pid}/stat").split(") ")[-1].split()
+            return int(f[11]) + int(f[12])  # utime + stime
+        a = ticks(); time.sleep(5); b = ticks()
+        m["idle_cpu"] = round((b - a) / 100 / 5 * 100, 1)  # % of one core (100 ticks/s)
+
+    # Stutter: move along the row and back, only while Aura is the app on screen.
+    if foreground_package(tv) == PKG:
+        tv.sh(f"dumpsys gfxinfo {PKG} reset")
+        tv.sh("for k in 22 22 22 22 22 21 21 21 21 21; do input keyevent $k; sleep 0.4; done", timeout=120)
+        g = tv.sh(f"dumpsys gfxinfo {PKG}")
+        tot = re.search(r"Total frames rendered: (\d+)", g)
+        jank = re.search(r"Janky frames: (\d+) \(([\d.]+)%\)", g)
+        if tot and jank:
+            m["frames"] = int(tot.group(1))
+            m["janky_pct"] = float(jank.group(2))
+    return m
+
+
+def launch_text(m):
+    def rng(v):
+        return f"{min(v)}–{max(v)} ms" if v else ""
+    parts = []
+    if m.get("launch_ms"):
+        parts.append(f"cold {rng(m['launch_ms'])}")
+    if m.get("warm_ms"):
+        parts.append(f"warm {rng(m['warm_ms'])} (Android kept Aura's process running)")
+    return ", ".join(parts) or "not measured"
+
+
+def write_report(info, rows, w, why, version, applied, pre, m, extras):
+    os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
+    name = re.sub(r"[^A-Za-z0-9]+", "-", info.get("ro.product.model", "tv")).strip("-")
+    path = os.path.join(ROOT, "reports", f"{name}-{datetime.date.today()}.md")
+    with open(path, "w") as f:
+        f.write(f"# Aura TV on {info.get('ro.product.manufacturer', '')} {info.get('ro.product.model', '')}\n\n")
+        f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M} · Aura {version} · tools/aura-setup\n\n")
+        f.write("| | |\n|---|---|\n")
+        for k, v in rows[:-1]:
+            f.write(f"| {k} | {v} |\n")
+        f.write(f"| Setup | {w} ({', '.join(why)}) |\n| Aura's choice | {applied} |\n| Precompile | {pre} |\n")
+        if m.get("skipped"):
+            f.write(f"| Measurements | skipped: {m['skipped']} |\n")
+        elif m:
+            f.write(f"| Launch | {launch_text(m)} |\n")
+            f.write(f"| Memory (PSS) | {m.get('pss_mb')} MB |\n| Idle CPU | {m.get('idle_cpu', '?')} % of one core |\n")
+            f.write(f"| Stutter while navigating | {m.get('janky_pct', '?')} % of {m.get('frames', '?')} frames |\n")
+        if info.get("emulator"):
+            f.write("\nThis is an emulator: its timings and stutter numbers don't match a real TV.\n")
+        for e in extras:
+            f.write(f"\n- {e}")
+        f.write("\n")
+    return path
+
+
+# ---------------------------------------------------------------- main
+
+def main():
+    ap = argparse.ArgumentParser(description="Check a TV, then install, tune, precompile and measure Aura TV on it.")
+    ap.add_argument("tv", help="the TV's address, e.g. 192.168.1.50:5555 (or an emulator serial)")
+    ap.add_argument("--apk", help="APK to install (default: newest dist/AuraTV-*.apk)")
+    ap.add_argument("--check-only", action="store_true", help="only look at the TV and print the plan; change nothing")
+    ap.add_argument("--yes", action="store_true", help="install without asking (optional steps still need their own flag or a yes)")
+    ap.add_argument("--grant-usage", action="store_true", help="Fire TV: grant usage access for the Home button redirect")
+    ap.add_argument("--set-home", action="store_true", help="Android TV: make Aura the Home app")
+    ap.add_argument("--no-measure", action="store_true", help="skip the measurements")
+    args = ap.parse_args()
+
+    say(f"Aura TV setup → {args.tv}\n")
+    tv = connect(args.tv)
+    fg = safety_gate(tv)
+
+    say("1. Checking the TV (read-only)")
+    info = inspect(tv)
+    w, why = tier(info)
+    rows = [
+        ("TV", f"{info.get('ro.product.manufacturer', '?')} {info.get('ro.product.model', '?')} ({info.get('ro.product.device', '?')})"),
+        ("System", info["os"] + (f" · {info['ro.build.version.name']}" if info["fire_os"] and info.get("ro.build.version.name") else "")),
+        ("CPU", f"{info['cores']} cores" + (f" up to {info['max_mhz']} MHz" if info["max_mhz"] else "") + f" · {info.get('ro.product.cpu.abi', '?')}"),
+        ("Memory", f"{info['mem_mb']} MB" + (" · low-RAM mode" if info["low_ram"] else "")),
+        ("Graphics", info["gles_short"]),
+        ("Screen", f"{info.get('size', '?')} at {info.get('density', '?')} dpi"),
+        ("Home app now", info["home"]),
+        ("Aura installed", info.get("aura") or "no"),
+        ("On screen", fg or "unknown"),
+    ]
+    for k, v in rows:
+        say(f"   {k:<15} {v}")
+
+    apk = find_apk(args.apk, required=not args.check_only)
+    say(f"\n2. Plan for this TV")
+    say(f"   Setup: {w} ({', '.join(why)})")
+    if w == "Light":
+        say("     Aura picks: solid background, Quick animations, Keep the TV Light on")
+    else:
+        say("     Aura keeps its defaults (solid background, Normal animations, Keep the TV Light on)")
+    if info.get("aura"):
+        say("     Aura is already installed, so it keeps the settings it has; this only updates it.")
+    say(f"   Install: {os.path.relpath(apk, os.getcwd()) if apk else 'no APK found yet (see README)'}")
+    say("   Precompile: " + ("yes (cmd package compile -m speed)" if info["api"] >= 24 else "not needed on Android 5–6"))
+    if info["fire_os"]:
+        say("   Home button: Fire OS can't change its home screen; Aura's redirect can be turned on (usage access)")
+    elif info["api"] >= 24:
+        say("   Home button: Aura can be made the Home app (--set-home)")
+    if args.check_only:
+        path = write_report(info, rows, w, why, info.get("aura") or "not installed",
+                            "not run (--check-only)", "not run (--check-only)", {}, [])
+        say(f"\n--check-only: nothing on the TV was changed. Report: {os.path.relpath(path, os.getcwd())}")
+        return
+    if not args.yes and not ask("\nInstall Aura on this TV now?", True):
+        say("Nothing was changed.")
+        return
+
+    safety_gate(tv)  # the TV may have started playing while we were asking
+    say("\n3. Installing")
+    fresh = not info.get("aura")
+    install(tv, apk)
+    version = tv.sh(f"dumpsys package {PKG} | grep -m1 versionName").split("=")[-1]
+    say(f"   Installed Aura {version}")
+
+    say("4. Precompiling")
+    pre = precompile(tv, info["api"])
+    say(f"   {pre}")
+
+    say("5. Starting Aura")
+    tv.sh(f"am start -W -n {ACTIVITY}")
+    time.sleep(4)
+    prof = re.search(r"device profile: (.+)", tv.sh("logcat -d -s Aura:I"))
+    applied = prof.group(1) if prof else ("chosen on an earlier install (kept)" if not fresh else "not seen in the log")
+    say(f"   Aura's own choice: {applied}")
+
+    extras = []
+    if info["fire_os"] and (args.grant_usage or ask("   Grant usage access so the Home button can open Aura?", False)):
+        tv.sh(f"appops set {PKG} GET_USAGE_STATS allow")
+        extras.append("Usage access granted. Turn the redirect on in Aura: Settings → System → Home Button.")
+    if not info["fire_os"] and info["api"] >= 24 and \
+            (args.set_home or ask("   Make Aura the Home app?", False)):
+        out = tv.sh(f"cmd package set-home-activity {ACTIVITY}")
+        extras.append(("Aura is now the Home app." if "Success" in out or not out else f"Setting Home failed: {out}")
+                      + f" To undo: adb -s {tv.serial} shell cmd package set-home-activity {info['home']}")
+    for e in extras:
+        say(f"   {e}")
+
+    m = {}
+    if not args.no_measure:
+        say("6. Measuring (about a minute; Aura will restart a few times)")
+        why_not = ready_to_measure(tv)
+        if why_not:
+            say(f"   Skipped: {why_not}")
+            m = {"skipped": why_not}
+        else:
+            m = measure(tv)
+    if m and "skipped" not in m:
+        say(f"   Launch {launch_text(m)}")
+        say(f"   Memory {m.get('pss_mb')} MB · idle CPU {m.get('idle_cpu', '?')} % of a core · "
+            f"stutter {m.get('janky_pct', '?')} % of {m.get('frames', '?')} frames")
+
+    path = write_report(info, rows, w, why, version, applied, pre, m, extras)
+    say(f"\nDone. Report: {os.path.relpath(path, os.getcwd())}")
+    say("If something looks wrong, open an issue on GitHub and attach this report.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        say("\nStopped.")
+        sys.exit(1)
+    except subprocess.TimeoutExpired as e:
+        fail(f"The TV stopped answering ({' '.join(e.cmd[3:5])}). Check it's on and connected, then try again.")

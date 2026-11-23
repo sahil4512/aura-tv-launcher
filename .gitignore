@@ -1,0 +1,49 @@
+# --- Build outputs ---
+.gradle/
+.kotlin/
+build/
+*/build/
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+output-metadata.json
+# Release APKs live in dist/ (kept locally, not versioned); their checksums are versioned.
+!dist/*.sha256
+
+# --- Signing credentials (never commit) ---
+keystore/
+*.jks
+*.keystore
+signing.properties
+keystore.properties
+
+# --- Local configuration ---
+local.properties
+.idea/
+*.iml
+.vscode/
+.claude/settings.local.json
+
+# --- Temporary files ---
+.DS_Store
+*.swp
+*~
+*.tmp
+*.log
+__pycache__/
+*.pyc
+
+# --- Emulator / device artifacts ---
+*.hprof
+*.trace
+*.perfetto-trace
+bugreport*.zip
+*.avd/
+*.img
+
+# --- Personal notes (device lists, measurements of your own TVs) ---
+private/
+reports/

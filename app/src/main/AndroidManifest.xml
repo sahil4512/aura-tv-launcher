@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- TV: no touchscreen required; leanback optional so it also installs on other Android boxes. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <!-- Implied by the location permission (Wi-Fi name only); TVs have no location hardware. -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+
+    <!-- Only used when you import your own wallpapers / videos or write a settings backup. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
+    <!-- Home's Wi-Fi chip: reads whether you're online and the network's name. Read-only. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- "Keep the TV light": end other apps' background processes when an app is opened (never the one on screen). -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+    <!-- Android 8.1+ shows the Wi-Fi network's name only to apps with location permission. Aura uses it
+         for the chip's label and nothing else; it never reads or requests a location. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Only the screensaver's photo-of-the-day download uses the network (Bing or NASA); the
+         launcher itself never does. Choosing "Aura wallpapers (offline)" turns it off entirely. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Home-button redirect + "Recently used" row. Granted once over ADB on Fire TV
+         (adb shell appops set com.auratv.launcher GET_USAGE_STATS allow). -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Android 11+ package visibility: we only need to see launchable apps. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".AuraApp"
+        android:allowBackup="true"
+        android:banner="@drawable/banner"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:hardwareAccelerated="true"
+        android:largeHeap="false"
+        android:theme="@style/Theme.Aura">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:clearTaskOnLaunch="true"
+            android:resumeWhilePausing="true"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustNothing"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|smallestScreenSize|screenLayout|uiMode|density|fontScale|locale|layoutDirection|touchscreen|mcc|mnc">
+
+            <!-- Visible in app lists / Launcher Hijack's picker. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+
+            <!-- Declares Aura as a Home app (used by stock Android TV and by Home-button helpers).
+                 Fire OS keeps its own launcher as the system Home; Launcher Hijack bridges the gap. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="fireos.intent.category.MAIN_HOME" />
+            </intent-filter>
+        </activity>
+
+        <!-- Screensaver: photo of the day with the clock (Settings → Device Preferences → Screen saver). -->
+        <service
+            android:name=".screensaver.AuraDreamService"
+            android:exported="true"
+            android:label="Aura"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <!-- Home-button redirect: own tiny process so the launcher UI can be reclaimed independently. -->
+        <service
+            android:name=".redirect.HomeRedirectService"
+            android:process=":redirect"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Redirects the Fire TV Home button to this launcher" />
+        </service>
+
+        <receiver
+            android:name=".redirect.BootReceiver"
+            android:process=":redirect"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Experimental instant Home (off unless explicitly enabled). -->
+        <service
+            android:name=".redirect.AuraAccessibilityService"
+            android:process=":redirect"
+            android:exported="true"
+            android:label="Aura TV instant Home (experimental)"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/aura_accessibility" />
+        </service>
+    </application>
+</manifest>

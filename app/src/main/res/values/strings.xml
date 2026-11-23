@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Aura TV</string>
+    <string name="accessibility_description">Aura TV (experimental): opens Aura instantly when you press Home. Reads no screen content; only watches the Home key and Amazon Home windows.</string>
+</resources>
