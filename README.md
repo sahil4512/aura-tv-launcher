@@ -7,7 +7,11 @@ It has no ads, no accounts and no tracking. It is built to stay quick on slow, c
 
 ### ⬇ [Download AuraTV.apk](https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.apk)
 
-On the TV, type this into the free **Downloader** app (it always gets the newest version):
+On the TV, open the free **Downloader** app and enter the code:
+
+## `1212393`
+
+Or type the full address (both always get the newest version):
 
 ```
 https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.apk
@@ -83,7 +87,8 @@ https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.ap
      (If Developer options is missing: My Fire TV → About, select the device name 7 times.)
    - **Android TV / Google TV:** Settings → Apps → Security & restrictions → Unknown sources →
      Downloader → On. (On some TVs: Settings → Device Preferences → Security & restrictions.)
-3. Open Downloader, type the address above, and choose **Install** when it finishes downloading.
+3. Open Downloader, enter the code **1212393** (or the address above), and choose **Install**
+   when it finishes downloading.
 4. Open **Aura TV**. It checks your TV and picks the right setup by itself on first start.
 
 Then see [Make Aura your home screen](#make-aura-your-home-screen).
