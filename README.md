@@ -55,10 +55,34 @@ If you try it on another TV, please open an issue and say how it went.
 
 ## Install it on your TV
 
-You install Aura from a computer over your home Wi-Fi, using **adb** (Android's free
-command-line tool). This takes about five minutes the first time.
+There are two ways. **Quick install** needs only the TV and its remote. **Full setup** uses a
+computer and also tunes, precompiles and measures Aura on your TV in one go.
 
-### 1. Turn on developer options on the TV
+### Quick install (no computer)
+
+The ready-to-install APK is always at this address (it points to the newest version):
+
+```
+https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.apk
+```
+
+1. Install the free **Downloader** app (by AFTVnews) from the Amazon Appstore or Google Play.
+2. Allow it to install apps:
+   - **Fire TV:** Settings → My Fire TV → Developer options → Install unknown apps → Downloader → On.
+     (If Developer options is missing: My Fire TV → About, select the device name 7 times.)
+   - **Android TV / Google TV:** Settings → Apps → Security & restrictions → Unknown sources →
+     Downloader → On. (On some TVs: Settings → Device Preferences → Security & restrictions.)
+3. Open Downloader, type the address above, and choose **Install** when it finishes downloading.
+4. Open **Aura TV**. It checks your TV and picks the right setup by itself on first start.
+
+Then see [Make Aura your home screen](#make-aura-your-home-screen).
+
+Android compiles Aura for your TV's chip on its own while the TV is idle, usually within a day,
+so it gets a little faster after the first day. The full setup below does that immediately.
+
+### Full setup (with a computer)
+
+#### 1. Turn on developer options on the TV
 
 - **Fire TV:** Settings → My Fire TV → About. Select the device name 7 times. Then go back to
   My Fire TV → Developer options and turn on **ADB debugging**.
@@ -66,20 +90,20 @@ command-line tool). This takes about five minutes the first time.
   Then go back to Device Preferences → Developer options and turn on **USB debugging** (it also
   covers network debugging on most TVs).
 
-### 2. Find the TV's IP address
+#### 2. Find the TV's IP address
 
 - **Fire TV:** Settings → My Fire TV → About → Network.
 - **Android TV:** Settings → Network & Internet → your Wi-Fi network.
 
 It looks like `192.168.1.50`. Below, replace `<tv-ip>` with it.
 
-### 3. Install adb on your computer
+#### 3. Install adb on your computer
 
 - **macOS:** `brew install android-platform-tools`
 - **Windows / Linux:** download [Android SDK Platform-Tools](https://developer.android.com/tools/releases/platform-tools)
   and unzip it.
 
-### 4. Download Aura
+#### 4. Download Aura
 
 Get the newest `AuraTV-x.y.z.apk` from the [Releases](../../releases) page and put it in this
 repo's `dist/` folder (or anywhere you like). Each release also lists the file's SHA-256, so you
@@ -89,7 +113,7 @@ can check it downloaded correctly:
 shasum -a 256 dist/AuraTV-*.apk
 ```
 
-### 5. Install with one command
+#### 5. Install with one command
 
 ```bash
 tools/aura-setup <tv-ip>:5555
@@ -126,7 +150,6 @@ adb -s <tv-ip>:5555 install -r AuraTV-x.y.z.apk
 adb -s <tv-ip>:5555 shell cmd package compile -m speed -f com.auratv.launcher
 ```
 
-You can also sideload the APK with an app like **Downloader** if you host it on your network.
 
 ---
 
