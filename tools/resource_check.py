@@ -4,7 +4,7 @@ Resource measurements for the 0.3.3 fixes, release builds, EMULATOR ONLY (rootab
 e.g. the API 25 `aura_api25` AVD, for reading Aura's private tile cache).
 
     tools/resource_check.py --serial emulator-5556 --fixture testfixture/build/outputs/apk \
-        --apk 0.3.2=dist/AuraTV-0.3.2.apk --apk 0.3.3=dist/AuraTV-0.3.3.apk --out /tmp/aura-res [--reboot]
+        --apk 0.3.2=dist/GlowHomeTV-0.3.2.apk --apk 0.3.3=dist/GlowHomeTV-0.3.3.apk --out /tmp/aura-res [--reboot]
 
 Per APK (fresh install, Home pointed at the emulator launcher):
   * tiles: favourites + recents seeded so 4 apps appear in both rows; tile files rewritten per cold

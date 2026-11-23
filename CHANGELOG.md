@@ -7,7 +7,7 @@ versionCode 19.
 - **New name: GlowHome TV.** Another Android TV launcher is called "Aura", so the app shows a new name everywhere you see it: the app list, the TV banner, Settings, the prompts, the screensaver and the README.
 - **Nothing else changes for you.** The package stays `com.auratv.launcher`, so 0.6.x updates in place and keeps your settings, favourites and backups. The download name `AuraTV.apk` and Downloader code 1212393 still work, and so do the backup file `/sdcard/AuraTV/aura-backup.json`, the `tools/aura-setup` and `tools/tv-cleanup` scripts, and log tags.
 - The TV banner is redrawn with the new name (`tools/AuraArt.java`, `NAME`).
-- **Not renamed yet:** the promo video and GIF still show "Aura".
+- After the release: the GitHub repo is now `sahil4512/glowhome-tv-launcher` (old links redirect), the download is also published as `GlowHomeTV.apk` / `GlowHomeTV-x.y.z.apk` (`AuraTV.apk` keeps working), `tools/aura-setup` accepts both names in `dist/`, and the promo video and GIF show the new name.
 
 ## 0.6.7 — Aura asks to become your home screen (2026-11-23)
 

@@ -3,7 +3,7 @@
 Before/after performance comparison for Aura TV release builds. EMULATOR ONLY.
 
     tools/perf_compare.py --serial emulator-5554 --out /tmp/aura-perf \
-        --apk before=dist/AuraTV-0.3.0.apk --apk after=dist/AuraTV-0.3.1.apk
+        --apk before=dist/GlowHomeTV-0.3.0.apk --apk after=dist/GlowHomeTV-0.3.1.apk
 
 For each APK (fresh install, default settings, so wallpaper motion is on at 30 fps):
   * cold start: `am start -W` TotalTime and Aura's own "home ready" log, 5 runs (median); only

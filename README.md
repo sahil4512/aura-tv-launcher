@@ -7,7 +7,7 @@
 GlowHome TV replaces your TV's cluttered home screen with one clean row of the apps you actually use.
 It has no ads, no accounts and no tracking. It is built to stay quick on slow, cheap TV chips.
 
-### ⬇ [Download AuraTV.apk](https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.apk)
+### ⬇ [Download GlowHomeTV.apk](https://github.com/sahil4512/glowhome-tv-launcher/releases/latest/download/GlowHomeTV.apk)
 
 On the TV, open the free **Downloader** app and enter the code:
 
@@ -16,15 +16,17 @@ On the TV, open the free **Downloader** app and enter the code:
 Or type the full address (both always get the newest version):
 
 ```
-https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.apk
+https://github.com/sahil4512/glowhome-tv-launcher/releases/latest/download/GlowHomeTV.apk
 ```
+
+The old address ending in `AuraTV.apk` still works too.
 
 Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 [Full setup with a computer](#full-setup-with-a-computer)
 
-[![Same TV, press Home: Google's TV launcher 4.9 s vs GlowHome 0.9 s. Click to watch the video](docs/aura-promo.gif)](https://github.com/sahil4512/aura-tv-launcher/releases/download/v0.6.6/aura-tv-launcher-promo.mp4)
+[![Same TV, press Home: Google's TV launcher 4.9 s vs GlowHome 0.9 s. Click to watch the video](docs/glowhome-promo.gif)](https://github.com/sahil4512/glowhome-tv-launcher/releases/download/v0.7.0/glowhome-tv-promo.mp4)
 
-▶ **[Watch the 45-second video](https://github.com/sahil4512/aura-tv-launcher/releases/download/v0.6.6/aura-tv-launcher-promo.mp4)**
+▶ **[Watch the 45-second video](https://github.com/sahil4512/glowhome-tv-launcher/releases/download/v0.7.0/glowhome-tv-promo.mp4)**
 
 ![GlowHome TV home screen on a Fire TV](docs/home.png)
 
@@ -81,7 +83,7 @@ computer and also tunes, precompiles and measures GlowHome on your TV in one go.
 The ready-to-install APK is always at this address (it points to the newest version):
 
 ```
-https://github.com/sahil4512/aura-tv-launcher/releases/latest/download/AuraTV.apk
+https://github.com/sahil4512/glowhome-tv-launcher/releases/latest/download/GlowHomeTV.apk
 ```
 
 1. Install the free **Downloader** app (by AFTVnews) from the Amazon Appstore or Google Play.
@@ -124,12 +126,12 @@ It looks like `192.168.1.50`. Below, replace `<tv-ip>` with it.
 
 #### 4. Download GlowHome
 
-Get the newest `AuraTV-x.y.z.apk` from the [Releases](../../releases) page and put it in this
-repo's `dist/` folder (or anywhere you like). Each release also lists the file's SHA-256, so you
+Get the newest `GlowHomeTV-x.y.z.apk` from the [Releases](../../releases) page and put it in this
+repo's `dist/` folder (or anywhere you like). Older releases named it `AuraTV-x.y.z.apk`; both names work. Each release also lists the file's SHA-256, so you
 can check it downloaded correctly:
 
 ```bash
-shasum -a 256 dist/AuraTV-*.apk
+shasum -a 256 dist/GlowHomeTV-*.apk
 ```
 
 #### 5. Install with one command
@@ -163,7 +165,7 @@ Without the script, the same install by hand:
 adb connect <tv-ip>:5555
 ```
 ```bash
-adb -s <tv-ip>:5555 install -r AuraTV-x.y.z.apk
+adb -s <tv-ip>:5555 install -r GlowHomeTV-x.y.z.apk
 ```
 ```bash
 adb -s <tv-ip>:5555 shell cmd package compile -m speed -f com.auratv.launcher

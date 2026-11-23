@@ -170,7 +170,8 @@ def find_apk(given, required=True):
 
     def ver(p):
         return [int(x) for x in re.findall(r"\d+", os.path.basename(p))]
-    found = sorted(glob.glob(os.path.join(ROOT, "dist", "AuraTV-*.apk")), key=ver)
+    found = sorted(glob.glob(os.path.join(ROOT, "dist", "GlowHomeTV-*.apk")) +
+                   glob.glob(os.path.join(ROOT, "dist", "AuraTV-*.apk")), key=ver)
     if found:
         return found[-1]
     built = os.path.join(ROOT, "app/build/outputs/apk/release/app-release.apk")
@@ -178,7 +179,7 @@ def find_apk(given, required=True):
         return built
     if not required:
         return None
-    fail("No APK found. Download AuraTV-x.y.z.apk from the GitHub Releases page into dist/, "
+    fail("No APK found. Download GlowHomeTV-x.y.z.apk from the GitHub Releases page into dist/, "
          "build one (./gradlew assembleRelease), or pass --apk.")
 
 
@@ -317,7 +318,7 @@ def write_report(info, rows, w, why, version, applied, pre, m, extras):
 def main():
     ap = argparse.ArgumentParser(description="Check a TV, then install, tune, precompile and measure GlowHome TV on it.")
     ap.add_argument("tv", help="the TV's address, e.g. 192.168.1.50:5555 (or an emulator serial)")
-    ap.add_argument("--apk", help="APK to install (default: newest dist/AuraTV-*.apk)")
+    ap.add_argument("--apk", help="APK to install (default: newest dist/GlowHomeTV-*.apk or AuraTV-*.apk)")
     ap.add_argument("--check-only", action="store_true", help="only look at the TV and print the plan; change nothing")
     ap.add_argument("--yes", action="store_true", help="install without asking (optional steps still need their own flag or a yes)")
     ap.add_argument("--grant-usage", action="store_true", help="Fire TV: grant usage access for the Home button redirect")

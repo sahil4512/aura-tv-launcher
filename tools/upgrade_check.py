@@ -4,7 +4,7 @@ In-place upgrade check (release builds), EMULATOR ONLY, rootable userdebug image
 files). Installs --old, applies custom settings, then `adb install -r` --new over it and verifies the
 app identity, preferences, BootReceiver state and Home.
 
-    tools/upgrade_check.py --serial emulator-5556 --old dist/AuraTV-0.3.2.apk --new dist/AuraTV-0.3.3.apk --out /tmp/aura-upgrade
+    tools/upgrade_check.py --serial emulator-5556 --old dist/GlowHomeTV-0.3.2.apk --new dist/GlowHomeTV-0.3.3.apk --out /tmp/aura-upgrade
 """
 import argparse
 import os

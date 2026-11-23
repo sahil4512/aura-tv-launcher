@@ -108,7 +108,7 @@ object DefaultHomePolicy {
     const val COMPUTER_STEPS = "From a computer on the same Wi-Fi, run:\n" +
         "tools/aura-setup <tv-ip>:5555 --set-home\n" +
         "or: tools/tv-cleanup <tv-ip>:5555 --apply --replace-home\n" +
-        "(github.com/sahil4512/aura-tv-launcher)"
+        "(github.com/sahil4512/glowhome-tv-launcher)"
 
     class Prompt(val heading: String, val message: String, val goLabel: String?)
 
