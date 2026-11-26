@@ -30,8 +30,6 @@ import com.auratv.launcher.apps.AppEntry
 import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.apps.AppRepository
 import com.auratv.launcher.apps.RecentApps
-import com.auratv.launcher.backup.BackupNames
-import com.auratv.launcher.backup.LocalStorage
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.DefaultHomePolicy
 import com.auratv.launcher.redirect.HomeRedirect
@@ -1258,29 +1256,7 @@ class MainActivity : Activity() {
         if (ok) p?.invoke() else toast("Storage access is needed to read your images and videos")
     }
 
-    /** Where backups on the TV itself go: /sdcard/AuraTV up to Android 9, the app's own folder after. */
-    fun backupDir(): File {
-        if (Build.VERSION.SDK_INT <= 28) {
-            @Suppress("DEPRECATION")
-            return File(Environment.getExternalStorageDirectory(), "AuraTV")
-        }
-        return getExternalFilesDir(null) ?: filesDir
-    }
-
     fun backupJson(): String = prefs.toJson().toString(2)
-
-    /**
-     * Saves YYYYMMDD_aura-backup.json on the TV or a USB drive / SD card (a second backup on the
-     * same day replaces the first).
-     */
-    fun backupTo(place: LocalStorage.Place) = withStoragePermission {
-        val name = BackupNames.forDate()
-        val json = backupJson()
-        Bg.apps.execute {
-            val f = try { LocalStorage.write(place, name, json) } catch (e: Exception) { null }
-            Bg.main.post { toast(if (f != null) "Backed up to ${f.path}" else "Couldn't write $name to ${place.label}") }
-        }
-    }
 
     fun restoreFile(f: File) = withStoragePermission {
         Bg.apps.execute {

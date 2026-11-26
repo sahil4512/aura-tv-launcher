@@ -2,7 +2,7 @@
 
 ## Unreleased: back up to a network share
 
-- **Back Up Settings and Restore From Backup** now ask where: *This TV*, every USB drive / SD card that is plugged in, or *Network Share*. On a drive the backup goes to `AuraTV` at its top level when the TV allows writing there, otherwise to GlowHome's own folder on the drive; restore looks in both and at the top level.
+- **Back Up Settings** offers *Save Locally* and *Save to Network Share*, **Restore From Backup** *From Local Storage* and *From Network Share*. Locally you choose the internal storage or a USB drive / SD card that is plugged in and browse to any folder, laid out like a network share (*Save Backup Here*, the backups in it, its folders). Where Android doesn't let apps write, GlowHome offers its own folder on that storage instead.
 - **Network shares (SMB 2/3)**: like CoreELEC Installer's share browser, GlowHome searches the network and lists the computers and NAS it finds, A–Z (mDNS, WS-Discovery, a scan of your /24, NetBIOS names), with *Enter Address* (`192.168.1.10`, `\\NAS\Backups`) and *Search Again*. Then pick a shared folder and *Save Backup Here*, or pick a backup to restore.
 - **Logins**: guest access is tried first; when a share asks, sign in (`DOMAIN\user` works) and optionally *Remember this login*. Saved logins are kept apart from the settings, so backups never contain them, and are encrypted with an Android Keystore key on Android 6+. *Forget Saved Login* on the server's page.
 - **Backup files are named `YYYYMMDD_aura-backup.json`**, so backups of different days sit side by side. Restore lists them newest first, and still offers `aura-backup.json` from earlier versions.

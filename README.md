@@ -321,12 +321,13 @@ service. The app you are watching is never touched, and neither are system apps.
 difference on TVs with little memory. It has no effect on Android 14 and newer, which don't allow it.
 
 **Backup:** Settings → System → Back Up Settings saves your setup as `YYYYMMDD_aura-backup.json`
-(for example `20261126_aura-backup.json`): on the TV, on a USB drive or SD card, or in a shared folder
-on your network (a computer or NAS, SMB 2/3). *Restore From Backup* lists the backups there, newest
-first, and reads the one you pick back in, for example after reinstalling or on a second TV. On a USB
-drive or SD card the backup goes to `AuraTV` at the top of the drive when the TV allows it, otherwise
-to GlowHome's own folder there (`Android/data/com.auratv.launcher/files`); restore looks in both and
-at the top of the drive. A second backup on the
+(for example `20261126_aura-backup.json`). *Save Locally* lets you choose the internal storage or a
+USB drive / SD card that is plugged in, then browse to the folder you want; *Save to Network Share*
+does the same on a shared folder on your network (a computer or NAS, SMB 2/3). *Restore From Backup*
+browses the same way and lists the backups in each folder, newest first. Android doesn't let apps
+write everywhere (on a USB drive or SD card only in the app's own folder, and from Android 10 on not
+in every folder of the internal storage); when a folder can't be written, GlowHome offers its own
+folder on that storage (`Android/data/com.auratv.launcher/files`) instead. A second backup on the
 same day replaces that day's file; `aura-backup.json` from earlier versions is still offered.
 
 For a network share, GlowHome searches your network and lists the computers and NAS it finds, A–Z

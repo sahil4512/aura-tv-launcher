@@ -2,37 +2,38 @@ package com.auratv.launcher.backup
 
 import android.content.Context
 import android.os.Build
+import android.os.Environment
 import android.os.storage.StorageManager
 import java.io.File
 
 /**
- * Backup places on the TV itself: its own storage and every USB drive / SD card that is mounted.
+ * Storage on the TV for backups: the internal shared storage and every USB drive / SD card that
+ * is mounted, browsed folder by folder like a network share.
  *
- * Android lets an app write anywhere on a USB drive or SD card only through its own folder there
- * (`<drive>/Android/data/<package>/files`); the drive's top level is read-only for apps on most
- * TVs. So a backup goes to `<drive>/AuraTV` when that can be written, else to GlowHome's folder on
- * the drive, and a restore looks in the drive's top level, `AuraTV` and GlowHome's folder.
+ * Android does not let apps write everywhere: on USB drives / SD cards only inside the app's own
+ * folder (`Android/data/<package>/files`), and from Android 10 on internal storage outside a few
+ * folders neither. When a folder can't be written, [Volume.appDir] is the place that always works.
  */
 object LocalStorage {
 
-    /** [dirs]: where to look for backups; [writeDirs]: where to try saving one, in order. */
-    class Place(val label: String, val detail: String, val dirs: List<File>, val writeDirs: List<File>)
+    /** [root]: top of the volume; [appDir]: GlowHome's own folder on it (always writable), if any. */
+    class Volume(val label: String, val root: File, val appDir: File?, val removable: Boolean)
 
-    /** This TV ([tvDir], the folder backups always used) first, then each mounted USB drive / SD card. */
-    fun places(ctx: Context, tvDir: File): List<Place> {
-        val out = ArrayList<Place>()
-        out += Place("This TV", tvDir.path, listOf(tvDir), listOf(tvDir))
+    /** A folder's contents: sub-folders A–Z and backups newest first, or null if it can't be read. */
+    class Listing(val dirs: List<File>, val backups: List<File>)
+
+    /** Internal storage first, then each mounted USB drive / SD card. */
+    fun volumes(ctx: Context): List<Volume> {
+        val out = ArrayList<Volume>()
         val appDirs = try { ctx.getExternalFilesDirs(null) } catch (_: Exception) { emptyArray<File?>() }
-        // Index 0 is the TV's own shared storage; the others are removable volumes (null: not mounted).
+        @Suppress("DEPRECATION")
+        out += Volume("Internal Storage", Environment.getExternalStorageDirectory(), appDirs.getOrNull(0), false)
+        // Index 0 is the internal shared storage; the others are removable volumes (null: not mounted).
         for (appDir in appDirs.drop(1).filterNotNull()) {
             val path = appDir.path
             val i = path.indexOf("/Android/data/")
             if (i <= 0) continue
-            val root = File(path.substring(0, i))
-            val name = description(ctx, appDir) ?: "USB drive / SD card"
-            out += Place(name, root.path,
-                dirs = listOf(root, File(root, "AuraTV"), appDir),
-                writeDirs = listOf(File(root, "AuraTV"), appDir))
+            out += Volume(description(ctx, appDir) ?: "USB drive / SD card", File(path.substring(0, i)), appDir, true)
         }
         return out
     }
@@ -48,27 +49,19 @@ object LocalStorage {
         }
     }
 
-    /** Backups in a place, newest first (each file once). */
-    fun backups(p: Place): List<File> {
-        val seen = HashSet<String>()
-        val files = p.dirs.flatMap { d -> d.listFiles { f -> f.isFile && BackupNames.isBackup(f.name) }?.toList() ?: emptyList() }
-            .filter { seen.add(try { it.canonicalPath } catch (_: Exception) { it.path }) }
-        return BackupNames.newestFirst(files, { it.name }, { it.lastModified() })
+    /** Sub-folders (A–Z) and backups (newest first) of [dir]; hidden entries left out. */
+    fun list(dir: File): Listing? {
+        val all = dir.listFiles() ?: return null
+        val dirs = all.filter { it.isDirectory && !it.name.startsWith(".") }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        val files = all.filter { it.isFile && BackupNames.isBackup(it.name) }
+        return Listing(dirs, BackupNames.newestFirst(files, { it.name }, { it.lastModified() }))
     }
 
-    /** Writes [text] as [name] into the first writable folder of the place; returns the file, or throws. */
-    fun write(p: Place, name: String, text: String): File {
-        var last: Exception? = null
-        for (d in p.writeDirs) {
-            try {
-                d.mkdirs()
-                val f = File(d, name)
-                f.writeText(text)
-                return f
-            } catch (e: Exception) {
-                last = e
-            }
-        }
-        throw last ?: IllegalStateException("nowhere to write")
+    /** Writes [text] as [name] into [dir] (created if missing); returns the file, or throws. */
+    fun write(dir: File, name: String, text: String): File {
+        dir.mkdirs()
+        val f = File(dir, name)
+        f.writeText(text)
+        return f
     }
 }

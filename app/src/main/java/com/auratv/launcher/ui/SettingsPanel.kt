@@ -711,33 +711,87 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
     }
 
     private fun backupPage() = Page("Back Up Settings") {
-        val items = ArrayList<Item>()
-        items += Section("Local Storage")
-        for (pl in LocalStorage.places(ctx, activity.backupDir())) {
-            items += Action(pl.label, "Saves ${BackupNames.forDate()} · ${pl.detail}") { activity.backupTo(pl) }
-        }
-        items += Section("Network")
-        items += Nav("Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = true)) }
-        items
+        listOf(
+            Nav("Save Locally", { "Internal storage or a USB drive / SD card" }) { push(localPage(backup = true)) },
+            Nav("Save to Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = true)) },
+        )
     }
 
     private fun restorePage() = Page("Restore From Backup") {
-        val items = ArrayList<Item>()
-        items += Section("Local Storage")
-        for (pl in LocalStorage.places(ctx, activity.backupDir())) {
-            items += Nav(pl.label, { pl.detail }) { activity.withStoragePermission { push(localRestorePage(pl)) } }
-        }
-        items += Section("Network")
-        items += Nav("Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = false)) }
-        items
+        listOf(
+            Nav("From Local Storage", { "Internal storage or a USB drive / SD card" }) { push(localPage(backup = false)) },
+            Nav("From Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = false)) },
+        )
     }
 
-    private fun localRestorePage(pl: LocalStorage.Place) = Page(pl.label) {
-        val files = LocalStorage.backups(pl)
-        if (files.isEmpty()) listOf(Info("No backups found on ${pl.label} (${pl.detail}).", ""))
-        else files.map { f ->
-            Pick(f.name, backupDetail(f.lastModified(), f.length()) + " · " + (f.parent ?: ""), false, null) {
-                confirmRestore(f.name) { activity.restoreFile(f) }
+    /** Internal storage and each USB drive / SD card that is plugged in. */
+    private fun localPage(backup: Boolean) = Page("Local Storage") {
+        LocalStorage.volumes(ctx).map { v ->
+            Nav(v.label, { v.root.path }) { activity.withStoragePermission { push(localFolderPage(v.root, v, backup)) } }
+        }
+    }
+
+    /** A local folder, laid out like a network folder: save here / the backups, then sub-folders. */
+    private fun localFolderPage(dir: File, vol: LocalStorage.Volume, backup: Boolean): Page =
+        Page(if (dir == vol.root) vol.label else dir.name) {
+            val l = LocalStorage.list(dir)
+            val items = ArrayList<Item>()
+            val name = BackupNames.forDate()
+            if (backup) {
+                val exists = l?.backups?.any { it.name == name } == true
+                items += Action("Save Backup Here", "As $name" + if (exists) ", replacing today's backup" else "") {
+                    saveLocal(dir, vol, name, exists)
+                }
+            }
+            if (l == null) {
+                items += Info("This folder can't be opened.", "")
+                return@Page items
+            }
+            if (backup) {
+                if (l.backups.isNotEmpty()) {
+                    items += Section("Backups Here")
+                    for (f in l.backups) items += Info(f.name, backupDetail(f.lastModified(), f.length()))
+                }
+            } else {
+                if (l.backups.isEmpty()) items += Info("No backups in this folder.", "")
+                for (f in l.backups) items += Pick(f.name, backupDetail(f.lastModified(), f.length()), false, null) {
+                    confirmRestore(f.name) { activity.restoreFile(f) }
+                }
+            }
+            if (l.dirs.isNotEmpty()) {
+                items += Section("Folders")
+                for (d in l.dirs) items += Nav(d.name) { push(localFolderPage(d, vol, backup)) }
+            }
+            items
+        }
+
+    private fun saveLocal(dir: File, vol: LocalStorage.Volume, name: String, exists: Boolean) {
+        if (exists) {
+            activity.openOverlay(ConfirmOverlay(activity, "Replace today's backup?",
+                "$name is already in this folder. It will be replaced with your current settings.",
+                listOf("Replace" to { writeLocal(dir, vol, name) }, "Cancel" to {})))
+        } else writeLocal(dir, vol, name)
+    }
+
+    /** Writes the backup; where Android doesn't let apps write, offers GlowHome's own folder on that storage. */
+    private fun writeLocal(dir: File, vol: LocalStorage.Volume, name: String) {
+        val json = activity.backupJson()
+        Bg.net.execute {
+            val f = try { LocalStorage.write(dir, name, json) } catch (e: Exception) { null }
+            Bg.main.post {
+                if (f != null) {
+                    activity.toast("Backed up to ${f.path}")
+                    refreshIfShown() // the folder page lists the new file
+                    return@post
+                }
+                val app = vol.appDir
+                if (app == null || app == dir) {
+                    activity.toast("Couldn't save $name in ${dir.path}")
+                    return@post
+                }
+                activity.openOverlay(ConfirmOverlay(activity, "Can't save here",
+                    "Android doesn't let apps write to ${dir.path}. Save to GlowHome's own folder on ${vol.label} instead?\n\n${app.path}",
+                    listOf("Save There" to { writeLocal(app, vol, name) }, "Choose Another Folder" to {})))
             }
         }
     }
