@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: back up to a network share
+
+- **Back Up Settings** offers *Save Locally* and *Save to Network Share*, **Restore From Backup** *From Local Storage* and *From Network Share*. Locally you choose the internal storage or a USB drive / SD card that is plugged in and browse to any folder, laid out like a network share (*Save Backup Here*, the backups in it, its folders). Where Android doesn't let apps write, GlowHome offers its own folder on that storage instead.
+- **Network shares (SMB 2/3)**: like CoreELEC Installer's share browser, GlowHome searches the network and lists the computers and NAS it finds, A–Z (mDNS, WS-Discovery, a scan of your /24, NetBIOS names), with *Enter Address* (`192.168.1.10`, `\\NAS\Backups`) and *Search Again*. Then pick a shared folder and *Save Backup Here*, or pick a backup to restore.
+- **Logins**: guest access is tried first; when a share asks, sign in (`DOMAIN\user` works) and optionally *Remember this login*. Saved logins are kept apart from the settings, so backups never contain them, and are encrypted with an Android Keystore key on Android 6+. *Forget Saved Login* on the server's page.
+- **Backup files are named `YYYYMMDD_aura-backup.json`**, so backups of different days sit side by side. Restore lists them newest first, and still offers `aura-backup.json` from earlier versions.
+- New dependency: `jcifs-ng` 2.1.10 (with Bouncy Castle and slf4j-api). GlowHome gives jcifs-ng its own small crypto provider (MD4, AES-CMAC) so R8 can drop the rest of Bouncy Castle's JCA classes. New permission: `CHANGE_WIFI_MULTICAST_STATE`.
+- **Tests:** `NetworkBackupTest` (file names and order, typed addresses, subnet scan, NetBIOS names).
+
 ## 0.7.0 — Aura TV is now GlowHome TV (2026-11-24)
 
 versionCode 19.

@@ -1081,6 +1081,8 @@ class MainActivity : Activity() {
         wallpaperView.frozen = overlays.any { it.coversWallpaper }
     }
 
+    fun isTopOverlay(o: Overlay) = overlays.lastOrNull() === o
+
     fun openSettings() = openOverlay(SettingsPanel(this))
     fun openAllApps() = openOverlay(AllAppsOverlay(this))
     fun openAppMenu(e: AppEntry, inFav: Boolean) = openOverlay(AppMenuOverlay(this, e, inFav))
@@ -1254,37 +1256,27 @@ class MainActivity : Activity() {
         if (ok) p?.invoke() else toast("Storage access is needed to read your images and videos")
     }
 
-    fun backupFile(): File {
-        if (Build.VERSION.SDK_INT <= 28) {
-            @Suppress("DEPRECATION")
-            return File(File(Environment.getExternalStorageDirectory(), "AuraTV"), "aura-backup.json")
-        }
-        return File(getExternalFilesDir(null) ?: filesDir, "aura-backup.json")
-    }
+    fun backupJson(): String = prefs.toJson().toString(2)
 
-    fun backupSettings() = withStoragePermission {
-        val f = backupFile()
-        val json = prefs.toJson().toString(2)
+    fun restoreFile(f: File) = withStoragePermission {
         Bg.apps.execute {
-            val ok = try { f.parentFile?.mkdirs(); f.writeText(json); true } catch (e: Exception) { false }
-            Bg.main.post { toast(if (ok) "Backed up to ${f.path}" else "Couldn't write ${f.path}") }
-        }
-    }
-
-    fun restoreSettings() = withStoragePermission {
-        val f = backupFile()
-        Bg.apps.execute {
-            val json = try { JSONObject(f.readText()) } catch (e: Exception) { null }
+            val text = try { f.readText() } catch (e: Exception) { null }
             Bg.main.post {
-                if (json == null) { toast("No backup found at ${f.path}"); return@post }
-                try {
-                    val n = prefs.restoreJson(json)
-                    reloadEverything()
-                    toast("Restored $n settings")
-                } catch (e: Exception) {
-                    toast(e.message ?: "Invalid backup")
-                }
+                if (text == null) toast("Couldn't read ${f.path}") else restoreText(text, f.name)
             }
+        }
+    }
+
+    /** Replaces the settings with a backup's JSON ([name] for messages). UI thread. */
+    fun restoreText(text: String, name: String) {
+        val json = try { JSONObject(text) } catch (e: Exception) { null }
+        if (json == null) { toast("$name is not a GlowHome TV backup file"); return }
+        try {
+            val n = prefs.restoreJson(json)
+            reloadEverything()
+            toast("Restored $n settings")
+        } catch (e: Exception) {
+            toast(e.message ?: "Invalid backup")
         }
     }
 

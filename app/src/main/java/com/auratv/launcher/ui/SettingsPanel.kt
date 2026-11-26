@@ -22,10 +22,16 @@ import android.widget.TextView
 import com.auratv.launcher.BuildConfig
 import com.auratv.launcher.R
 import com.auratv.launcher.apps.AppOrdering
+import com.auratv.launcher.backup.BackupNames
+import com.auratv.launcher.backup.LocalStorage
+import com.auratv.launcher.backup.SmbClient
+import com.auratv.launcher.backup.SmbDiscovery
+import com.auratv.launcher.backup.SmbLogins
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.HomeRedirect
 import com.auratv.launcher.settings.AuraTheme
 import com.auratv.launcher.settings.Prefs
+import com.auratv.launcher.util.Bg
 import com.auratv.launcher.util.Dp
 import com.auratv.launcher.util.dp
 import com.auratv.launcher.util.sizeDp
@@ -164,6 +170,7 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
 
     override fun onClosed() {
         root.viewTreeObserver.removeOnGlobalFocusChangeListener(focusTracker)
+        discovery?.stop()
     }
 
     private fun restyle() {
@@ -648,17 +655,355 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         items += Toggle("Keep the TV Light", "When you open an app, close other apps running in the background",
             { p.keepTvLight }, { p.keepTvLight = it })
         items += Section("Backup")
-        items += Action("Back Up Settings", "Saves to ${activity.backupFile().path}") { activity.backupSettings() }
-        items += Action("Restore From Backup", "Reads ${activity.backupFile().name}") {
-            activity.openOverlay(ConfirmOverlay(activity, "Restore settings?", "Your current settings will be replaced with the backup.",
-                listOf("Restore" to { activity.restoreSettings() }, "Cancel" to {})))
-        }
+        items += Nav("Back Up Settings", { "To this TV or a network share" }) { push(backupPage()) }
+        items += Nav("Restore From Backup", { "From this TV or a network share" }) { push(restorePage()) }
         items += Action("Reset GlowHome TV", "Theme, wallpaper, favourites — everything") {
             activity.openOverlay(ConfirmOverlay(activity, "Reset GlowHome TV?",
                 "All settings, favourites and hidden apps go back to defaults. Imported images are kept.",
                 listOf("Reset everything" to { activity.resetAll() }, "Cancel" to {})))
         }
         items
+    }
+
+    // ---------------------------------------------------------------- backup / restore
+
+    private val logins by lazy { SmbLogins(ctx) }
+    private var discovery: SmbDiscovery? = null
+    /** The network page whose server list discovery updates. */
+    private var networkPage: Page? = null
+
+    /** Redraw the current page, unless another overlay (a dialog) is on top; closing it redraws anyway. */
+    private fun refreshIfShown() {
+        if (activity.isTopOverlay(this)) reload()
+    }
+
+    /** Swap the current page for [page]: a fresh copy after signing in, or "Try Again". */
+    private fun replaceTop(page: Page) {
+        if (stack.size <= 1) return
+        stack[stack.size - 1] = page
+        render(focusFirst = true)
+    }
+
+    /**
+     * A page whose rows come from the network: shows [waiting] until [load] (on a background
+     * thread) has the rows, then redraws if the page is still the one on screen.
+     */
+    private fun asyncPage(title: String, waiting: String, load: (Page) -> List<Item>): Page {
+        var rows: List<Item>? = null
+        var started = false
+        lateinit var page: Page
+        page = Page(title) {
+            rows ?: run {
+                if (!started) {
+                    started = true
+                    Bg.net.execute {
+                        val r = try { load(page) } catch (e: Exception) { listOf(Info(SmbClient.describe(e), "")) }
+                        Bg.main.post {
+                            rows = r
+                            if (stack.lastOrNull() === page) refreshIfShown()
+                        }
+                    }
+                }
+                listOf(Info(waiting, ""))
+            }
+        }
+        return page
+    }
+
+    private fun backupPage() = Page("Back Up Settings") {
+        listOf(
+            Nav("Save Locally", { "Internal storage or a USB drive / SD card" }) { push(localPage(backup = true)) },
+            Nav("Save to Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = true)) },
+        )
+    }
+
+    private fun restorePage() = Page("Restore From Backup") {
+        listOf(
+            Nav("From Local Storage", { "Internal storage or a USB drive / SD card" }) { push(localPage(backup = false)) },
+            Nav("From Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = false)) },
+        )
+    }
+
+    /** Internal storage and each USB drive / SD card that is plugged in. */
+    private fun localPage(backup: Boolean) = Page("Local Storage") {
+        LocalStorage.volumes(ctx).map { v ->
+            Nav(v.label, { v.root.path }) { activity.withStoragePermission { push(localFolderPage(v.root, v, backup)) } }
+        }
+    }
+
+    /** A local folder, laid out like a network folder: save here / the backups, then sub-folders. */
+    private fun localFolderPage(dir: File, vol: LocalStorage.Volume, backup: Boolean): Page =
+        Page(if (dir == vol.root) vol.label else dir.name) {
+            val l = LocalStorage.list(dir)
+            val items = ArrayList<Item>()
+            val name = BackupNames.forDate()
+            if (backup) {
+                val exists = l?.backups?.any { it.name == name } == true
+                items += Action("Save Backup Here", "As $name" + if (exists) ", replacing today's backup" else "") {
+                    saveLocal(dir, vol, name, exists)
+                }
+            }
+            if (l == null) {
+                items += Info("This folder can't be opened.", "")
+                return@Page items
+            }
+            if (backup) {
+                if (l.backups.isNotEmpty()) {
+                    items += Section("Backups Here")
+                    for (f in l.backups) items += Info(f.name, backupDetail(f.lastModified(), f.length()))
+                }
+            } else {
+                if (l.backups.isEmpty()) items += Info("No backups in this folder.", "")
+                for (f in l.backups) items += Pick(f.name, backupDetail(f.lastModified(), f.length()), false, null) {
+                    confirmRestore(f.name) { activity.restoreFile(f) }
+                }
+            }
+            if (l.dirs.isNotEmpty()) {
+                items += Section("Folders")
+                for (d in l.dirs) items += Nav(d.name) { push(localFolderPage(d, vol, backup)) }
+            }
+            items
+        }
+
+    private fun saveLocal(dir: File, vol: LocalStorage.Volume, name: String, exists: Boolean) {
+        if (exists) {
+            activity.openOverlay(ConfirmOverlay(activity, "Replace today's backup?",
+                "$name is already in this folder. It will be replaced with your current settings.",
+                listOf("Replace" to { writeLocal(dir, vol, name) }, "Cancel" to {})))
+        } else writeLocal(dir, vol, name)
+    }
+
+    /** Writes the backup; where Android doesn't let apps write, offers GlowHome's own folder on that storage. */
+    private fun writeLocal(dir: File, vol: LocalStorage.Volume, name: String) {
+        val json = activity.backupJson()
+        Bg.net.execute {
+            val f = try { LocalStorage.write(dir, name, json) } catch (e: Exception) { null }
+            Bg.main.post {
+                if (f != null) {
+                    activity.toast("Backed up to ${f.path}")
+                    refreshIfShown() // the folder page lists the new file
+                    return@post
+                }
+                val app = vol.appDir
+                if (app == null || app == dir) {
+                    activity.toast("Couldn't save $name in ${dir.path}")
+                    return@post
+                }
+                activity.openOverlay(ConfirmOverlay(activity, "Can't save here",
+                    "Android doesn't let apps write to ${dir.path}. Save to GlowHome's own folder on ${vol.label} instead?\n\n${app.path}",
+                    listOf("Save There" to { writeLocal(app, vol, name) }, "Choose Another Folder" to {})))
+            }
+        }
+    }
+
+    private fun backupDetail(time: Long, size: Long): String =
+        java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(time)) +
+            " · " + maxOf(1L, (size + 1023) / 1024) + " KB"
+
+    private fun confirmRestore(name: String, run: () -> Unit) {
+        activity.openOverlay(ConfirmOverlay(activity, "Restore settings?",
+            "Your current settings will be replaced with $name.", listOf("Restore" to run, "Cancel" to {})))
+    }
+
+    private fun loginLabel(l: SmbLogins.Login?) = if (l == null || l.guest) "Guest" else l.user
+
+    /**
+     * Like CoreELEC Installer's share browser: what the search is doing, "Enter Address", then
+     * every server found on the network (A–Z; hosts with a saved login are listed too).
+     */
+    private fun networkPage(backup: Boolean): Page {
+        val d = discovery ?: SmbDiscovery(ctx, Bg.main, object : SmbDiscovery.Listener {
+            override fun onServer(s: SmbDiscovery.Server) { if (stack.lastOrNull() === networkPage) refreshIfShown() }
+            override fun onFinished() { if (stack.lastOrNull() === networkPage) refreshIfShown() }
+        }).also { discovery = it }
+        if (!d.running) d.start()
+        val page = Page("Network Shares") {
+            val items = ArrayList<Item>()
+            val found = d.servers()
+            val saved = logins.saved()
+            items += Info(when {
+                d.running -> "Searching the network…"
+                found.isEmpty() -> "No servers found. Use \u201cEnter Address\u201d."
+                else -> "Search finished."
+            }, "")
+            items += Action("Enter Address", "For example 192.168.1.10 or \\\\NAS\\Backups") { askAddress(backup) }
+            class Row(val host: String, val label: String, val sub: String?, val name: String?)
+            val rows = ArrayList<Row>()
+            val hosts = HashSet<String>()
+            for (s in found) {
+                hosts += s.ip
+                rows += Row(s.ip, s.label, (if (s.name != null) s.ip else null).let { ip ->
+                    if (logins.isSaved(s.ip)) listOfNotNull(ip, "saved login").joinToString(" · ") else ip
+                }, s.name)
+            }
+            for (sv in saved) if (sv.host !in hosts) {
+                rows += Row(sv.host, sv.name ?: sv.host, listOfNotNull(sv.host.takeIf { sv.name != null }, "saved login").joinToString(" · "), sv.name)
+            }
+            rows.sortWith(compareBy<Row, String>(String.CASE_INSENSITIVE_ORDER) { it.label }.thenBy { it.host })
+            for (r in rows) items += Nav(r.label, { r.sub }) { push(sharesPage(r.host, r.name, backup)) }
+            if (!d.running) items += Action("Search Again") { d.start(); reload() }
+            items
+        }
+        networkPage = page
+        return page
+    }
+
+    /** Rows for a failed connection: sign in (the dialog opens by itself) or try again. */
+    private fun failureRows(page: Page, e: Exception, host: String, name: String?, retry: () -> Unit): List<Item> {
+        val who = name ?: host
+        if (SmbClient.isAuthError(e)) {
+            Bg.main.post { if (stack.lastOrNull() === page && activity.isTopOverlay(this)) askLogin(host, name, retry) }
+            return listOf(
+                Info("$who asks for a user name and password.", ""),
+                Action("Sign In") { askLogin(host, name, retry) },
+            )
+        }
+        return listOf(
+            Info("Couldn't connect to $who: ${SmbClient.describe(e)}", ""),
+            Action("Try Again") { retry() },
+        )
+    }
+
+    private fun sharesPage(host: String, name: String?, backup: Boolean): Page =
+        asyncPage(name ?: host, "Connecting to ${name ?: host}…") { page ->
+            val login = logins.get(host)
+            try {
+                val shares = SmbClient.shares(SmbClient.context(login), host)
+                val items = ArrayList<Item>()
+                if (shares.isEmpty()) items += Info("${name ?: host} shares no folders.", "")
+                for (sh in shares) items += Nav(sh) { push(folderPage("smb://$host/$sh/", backup)) }
+                items += Section("Login")
+                items += Info("Signed in as", loginLabel(login))
+                items += Action("Sign In as Another User") { askLogin(host, name) { replaceTop(sharesPage(host, name, backup)) } }
+                if (logins.isSaved(host)) items += Action("Forget Saved Login", "The next visit asks again") {
+                    logins.forget(host)
+                    activity.toast("Login forgotten")
+                    pop()
+                }
+                items
+            } catch (e: Exception) {
+                failureRows(page, e, host, name) { replaceTop(sharesPage(host, name, backup)) }
+            }
+        }
+
+    /** A folder of a share: backup mode saves here, restore mode lists the backups; sub-folders below. */
+    private fun folderPage(url: String, backup: Boolean): Page {
+        val host = SmbClient.hostOf(url)
+        val title = url.removePrefix("smb://").trimEnd('/').substringAfterLast('/')
+        return asyncPage(title, "Opening ${SmbClient.displayPath(url)}…") { page ->
+            try {
+                val entries = SmbClient.list(SmbClient.context(logins.get(host)), url)
+                val dirs = entries.filter { it.dir }
+                val files = entries.filter { !it.dir }
+                val items = ArrayList<Item>()
+                if (backup) {
+                    val name = BackupNames.forDate()
+                    val exists = files.any { it.name == name }
+                    items += Action("Save Backup Here", "As $name" + if (exists) ", replacing today's backup" else "") {
+                        saveToShare(url, name, exists)
+                    }
+                    if (files.isNotEmpty()) {
+                        items += Section("Backups Here")
+                        for (f in files) items += Info(f.name, backupDetail(f.time, f.size))
+                    }
+                } else {
+                    if (files.isEmpty()) items += Info("No backups in this folder.", "")
+                    for (f in files) items += Pick(f.name, backupDetail(f.time, f.size), false, null) {
+                        confirmRestore(f.name) { restoreFromShare(f.url) }
+                    }
+                }
+                if (dirs.isNotEmpty()) {
+                    items += Section("Folders")
+                    for (dir in dirs) items += Nav(dir.name) { push(folderPage(dir.url, backup)) }
+                }
+                items
+            } catch (e: Exception) {
+                failureRows(page, e, host, null) { replaceTop(folderPage(url, backup)) }
+            }
+        }
+    }
+
+    private fun saveToShare(folder: String, name: String, exists: Boolean) {
+        if (exists) {
+            activity.openOverlay(ConfirmOverlay(activity, "Replace today's backup?",
+                "$name is already in this folder. It will be replaced with your current settings.",
+                listOf("Replace" to { writeToShare(folder, name) }, "Cancel" to {})))
+        } else writeToShare(folder, name)
+    }
+
+    private fun writeToShare(folder: String, name: String) {
+        val json = activity.backupJson()
+        val host = SmbClient.hostOf(folder)
+        val login = logins.get(host)
+        activity.toast("Saving $name…")
+        Bg.net.execute {
+            val err = try { SmbClient.writeText(SmbClient.context(login), folder + name, json); null } catch (e: Exception) { e }
+            Bg.main.post {
+                if (err != null) {
+                    activity.toast("Couldn't save the backup: ${SmbClient.describe(err)}")
+                    return@post
+                }
+                activity.toast("Backed up to ${SmbClient.displayPath(folder + name)}")
+                if (stack.size > 1 && activity.isTopOverlay(this)) replaceTop(folderPage(folder, backup = true))
+            }
+        }
+    }
+
+    private fun restoreFromShare(fileUrl: String) {
+        val login = logins.get(SmbClient.hostOf(fileUrl))
+        val name = fileUrl.substringAfterLast('/')
+        activity.toast("Reading $name…")
+        Bg.net.execute {
+            val r = try { Result.success(SmbClient.readText(SmbClient.context(login), fileUrl)) } catch (e: Exception) { Result.failure(e) }
+            Bg.main.post {
+                r.onSuccess { text -> activity.restoreText(text, name) }.onFailure { activity.toast("Couldn't read $name: ${SmbClient.describe(it)}") }
+            }
+        }
+    }
+
+    private fun askAddress(backup: Boolean) {
+        activity.openOverlay(FormOverlay(activity, "Enter server address",
+            "The name or IP address of the computer or NAS, optionally with a shared folder.",
+            listOf(FormOverlay.Field("Address", hint = "192.168.1.10 or \\\\NAS\\Backups")), null,
+            listOf(
+                "Connect" to { r: FormOverlay.Result ->
+                    val a = SmbClient.parseAddress(r.values[0])
+                    when {
+                        a == null -> activity.toast("Enter a server name or IP address")
+                        a.second != null -> push(folderPage(a.second!!, backup))
+                        else -> push(sharesPage(a.first, null, backup))
+                    }
+                },
+                "Cancel" to { _: FormOverlay.Result -> },
+            )))
+    }
+
+    /** User name (optionally DOMAIN\user) and password for [host]; Guest when the share allows it. */
+    private fun askLogin(host: String, name: String?, then: () -> Unit) {
+        val cur = logins.get(host)?.takeIf { !it.guest }
+        val user = cur?.let { if (it.domain.isNotEmpty()) it.domain + "\\" + it.user else it.user } ?: ""
+        activity.openOverlay(FormOverlay(activity, "Sign in to ${name ?: host}",
+            "The user name and password of the computer or NAS that shares the folder.",
+            listOf(FormOverlay.Field("User name", user), FormOverlay.Field("Password", password = true)),
+            FormOverlay.Toggle("Remember this login", true),
+            listOf(
+                "Sign In" to { r: FormOverlay.Result ->
+                    val typed = r.values[0]
+                    if (typed.isEmpty()) {
+                        activity.toast("Enter a user name, or continue as guest")
+                    } else {
+                        val domain = typed.substringBefore('\\', "")
+                        val u = typed.substringAfter('\\')
+                        logins.set(host, SmbLogins.Login(u, r.values[1], domain), r.toggled, name)
+                        then()
+                    }
+                },
+                "Continue as Guest" to { r: FormOverlay.Result ->
+                    logins.set(host, SmbLogins.Login.GUEST, r.toggled, name)
+                    then()
+                },
+                "Cancel" to { _: FormOverlay.Result -> },
+            )))
     }
 
     private fun homeButtonSummary(): String = when {
@@ -945,7 +1290,8 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
     }
 
     /** iOS-style switch drawn in one pass. */
-    private class ToggleView(c: Context) : View(c) {
+    /** The on/off switch of [Toggle] rows (also used by [FormOverlay]). */
+    class ToggleView(c: Context) : View(c) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         var checked = false
             set(v) { field = v; invalidate() }

@@ -75,11 +75,20 @@ android {
     lint {
         abortOnError = false
     }
+    packaging {
+        resources {
+            // Bouncy Castle (via jcifs-ng) is a multi-release jar; its Java 9 OSGi manifest is not needed.
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
+    }
 }
 
 dependencies {
     // Intentionally no AndroidX / Leanback / Play Services: the launcher is built on framework
     // Views only to keep cold start, APK size and RAM as low as possible.
+    // SMB client for backing up to / restoring from a network share (loaded only there). It brings
+    // Bouncy Castle (SPNEGO, SMB3 key derivation) and slf4j-api; R8 drops what is not used.
+    implementation("eu.agno3.jcifs:jcifs-ng:2.1.10")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303") // real JSON parsing for the photo-feed tests (Android's is a stub on the JVM)
 }

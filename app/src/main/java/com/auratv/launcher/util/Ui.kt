@@ -37,6 +37,9 @@ object Bg {
     /** Wallpaper decoding (kept separate so a slow tile render never delays a wallpaper). */
     val decode: ExecutorService = Executors.newSingleThreadExecutor(factory("aura-decode"))
 
+    /** Network shares (settings backup): slow, blocking calls that must never hold up the others. */
+    val net: ExecutorService = Executors.newCachedThreadPool(factory("aura-net"))
+
     private fun factory(name: String) = ThreadFactory { r ->
         Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)

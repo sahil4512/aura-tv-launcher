@@ -23,9 +23,12 @@
          for the chip's label and nothing else; it never reads or requests a location. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Only the screensaver's photo-of-the-day download uses the network (Bing or NASA); the
-         launcher itself never does. Choosing "Aura wallpapers (offline)" turns it off entirely. -->
+    <!-- The screensaver's photo-of-the-day download (Bing or NASA; "Aura wallpapers (offline)" turns
+         it off) and, only when you choose it, backing up settings to / restoring them from a shared
+         folder on your home network. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Finding computers and NAS with shared folders (mDNS / WS-Discovery) while that list is open. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <!-- Home-button redirect + "Recently used" row. Granted once over ADB on Fire TV
          (adb shell appops set com.auratv.launcher GET_USAGE_STATS allow). -->

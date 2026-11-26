@@ -320,8 +320,21 @@ other apps that are sitting in the background using memory, for example Netflix'
 service. The app you are watching is never touched, and neither are system apps. This makes a big
 difference on TVs with little memory. It has no effect on Android 14 and newer, which don't allow it.
 
-**Backup:** Settings → System → Back Up Settings saves your setup to a file on the TV. *Restore
-From Backup* reads it back, for example after reinstalling.
+**Backup:** Settings → System → Back Up Settings saves your setup as `YYYYMMDD_aura-backup.json`
+(for example `20261126_aura-backup.json`). *Save Locally* lets you choose the internal storage or a
+USB drive / SD card that is plugged in, then browse to the folder you want; *Save to Network Share*
+does the same on a shared folder on your network (a computer or NAS, SMB 2/3). *Restore From Backup*
+browses the same way and lists the backups in each folder, newest first. Android doesn't let apps
+write everywhere (on a USB drive or SD card only in the app's own folder, and from Android 10 on not
+in every folder of the internal storage); when a folder can't be written, GlowHome offers its own
+folder on that storage (`Android/data/com.auratv.launcher/files`) instead. A second backup on the
+same day replaces that day's file; `aura-backup.json` from earlier versions is still offered.
+
+For a network share, GlowHome searches your network and lists the computers and NAS it finds, A–Z
+(or choose *Enter Address*, such as `192.168.1.10` or `\\NAS\Backups`), then the shared folders. When a share asks for a
+user name and password, *Remember this login* keeps them for next time: they are stored separately
+from your settings (so a backup never contains them) and, on Android 6 and newer, encrypted with a
+key kept in the Android Keystore. A saved login can be forgotten from the server's page.
 
 ---
 
@@ -387,7 +400,8 @@ NASA), and only while GlowHome is your chosen screensaver.
 | Close background apps (`KILL_BACKGROUND_PROCESSES`) | Keep the TV Light |
 | Storage | Backup and restore of GlowHome's settings |
 | Start at boot, foreground service | Restarting the Home button redirect after the TV restarts, only if you turned it on |
-| Internet | The screensaver photo |
+| Internet | The screensaver photo, and backing up to / restoring from a shared folder on your network when you choose it |
+| Wi-Fi multicast (`CHANGE_WIFI_MULTICAST_STATE`) | Finding computers and NAS with shared folders while that list is open |
 
 ---
 
