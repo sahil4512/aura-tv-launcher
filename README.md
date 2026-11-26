@@ -320,8 +320,17 @@ other apps that are sitting in the background using memory, for example Netflix'
 service. The app you are watching is never touched, and neither are system apps. This makes a big
 difference on TVs with little memory. It has no effect on Android 14 and newer, which don't allow it.
 
-**Backup:** Settings → System → Back Up Settings saves your setup to a file on the TV. *Restore
-From Backup* reads it back, for example after reinstalling.
+**Backup:** Settings → System → Back Up Settings saves your setup as `YYYYMMDD_aura-backup.json`
+(for example `20261126_aura-backup.json`), either on the TV or in a shared folder on your network
+(a computer or NAS, SMB 2/3). *Restore From Backup* lists the backups there, newest first, and reads
+the one you pick back in, for example after reinstalling or on a second TV. A second backup on the
+same day replaces that day's file; `aura-backup.json` from earlier versions is still offered.
+
+For a network share, GlowHome lists the computers and NAS it finds on your network (or type the
+address, such as `192.168.1.10` or `\\NAS\Backups`), then the shared folders. When a share asks for a
+user name and password, *Remember this login* keeps them for next time: they are stored separately
+from your settings (so a backup never contains them) and, on Android 6 and newer, encrypted with a
+key kept in the Android Keystore. A saved login can be forgotten from the server's page.
 
 ---
 
@@ -387,7 +396,8 @@ NASA), and only while GlowHome is your chosen screensaver.
 | Close background apps (`KILL_BACKGROUND_PROCESSES`) | Keep the TV Light |
 | Storage | Backup and restore of GlowHome's settings |
 | Start at boot, foreground service | Restarting the Home button redirect after the TV restarts, only if you turned it on |
-| Internet | The screensaver photo |
+| Internet | The screensaver photo, and backing up to / restoring from a shared folder on your network when you choose it |
+| Wi-Fi multicast (`CHANGE_WIFI_MULTICAST_STATE`) | Finding computers and NAS with shared folders while that list is open |
 
 ---
 

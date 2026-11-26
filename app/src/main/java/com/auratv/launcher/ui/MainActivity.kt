@@ -30,6 +30,7 @@ import com.auratv.launcher.apps.AppEntry
 import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.apps.AppRepository
 import com.auratv.launcher.apps.RecentApps
+import com.auratv.launcher.backup.BackupNames
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.DefaultHomePolicy
 import com.auratv.launcher.redirect.HomeRedirect
@@ -1081,6 +1082,8 @@ class MainActivity : Activity() {
         wallpaperView.frozen = overlays.any { it.coversWallpaper }
     }
 
+    fun isTopOverlay(o: Overlay) = overlays.lastOrNull() === o
+
     fun openSettings() = openOverlay(SettingsPanel(this))
     fun openAllApps() = openOverlay(AllAppsOverlay(this))
     fun openAppMenu(e: AppEntry, inFav: Boolean) = openOverlay(AppMenuOverlay(this, e, inFav))
@@ -1254,37 +1257,52 @@ class MainActivity : Activity() {
         if (ok) p?.invoke() else toast("Storage access is needed to read your images and videos")
     }
 
-    fun backupFile(): File {
+    /** Where backups on the TV itself go: /sdcard/AuraTV up to Android 9, the app's own folder after. */
+    fun backupDir(): File {
         if (Build.VERSION.SDK_INT <= 28) {
             @Suppress("DEPRECATION")
-            return File(File(Environment.getExternalStorageDirectory(), "AuraTV"), "aura-backup.json")
+            return File(Environment.getExternalStorageDirectory(), "AuraTV")
         }
-        return File(getExternalFilesDir(null) ?: filesDir, "aura-backup.json")
+        return getExternalFilesDir(null) ?: filesDir
     }
 
+    /** Backups on the TV (YYYYMMDD_aura-backup.json, and aura-backup.json of 0.7.0 and earlier), newest first. */
+    fun localBackups(): List<File> {
+        val files = backupDir().listFiles { f -> f.isFile && BackupNames.isBackup(f.name) }?.toList() ?: emptyList()
+        return BackupNames.newestFirst(files, { it.name }, { it.lastModified() })
+    }
+
+    fun backupJson(): String = prefs.toJson().toString(2)
+
+    /** Saves YYYYMMDD_aura-backup.json on the TV (a second backup on the same day replaces the first). */
     fun backupSettings() = withStoragePermission {
-        val f = backupFile()
-        val json = prefs.toJson().toString(2)
+        val f = File(backupDir(), BackupNames.forDate())
+        val json = backupJson()
         Bg.apps.execute {
             val ok = try { f.parentFile?.mkdirs(); f.writeText(json); true } catch (e: Exception) { false }
             Bg.main.post { toast(if (ok) "Backed up to ${f.path}" else "Couldn't write ${f.path}") }
         }
     }
 
-    fun restoreSettings() = withStoragePermission {
-        val f = backupFile()
+    fun restoreFile(f: File) = withStoragePermission {
         Bg.apps.execute {
-            val json = try { JSONObject(f.readText()) } catch (e: Exception) { null }
+            val text = try { f.readText() } catch (e: Exception) { null }
             Bg.main.post {
-                if (json == null) { toast("No backup found at ${f.path}"); return@post }
-                try {
-                    val n = prefs.restoreJson(json)
-                    reloadEverything()
-                    toast("Restored $n settings")
-                } catch (e: Exception) {
-                    toast(e.message ?: "Invalid backup")
-                }
+                if (text == null) toast("Couldn't read ${f.path}") else restoreText(text, f.name)
             }
+        }
+    }
+
+    /** Replaces the settings with a backup's JSON ([name] for messages). UI thread. */
+    fun restoreText(text: String, name: String) {
+        val json = try { JSONObject(text) } catch (e: Exception) { null }
+        if (json == null) { toast("$name is not a GlowHome TV backup file"); return }
+        try {
+            val n = prefs.restoreJson(json)
+            reloadEverything()
+            toast("Restored $n settings")
+        } catch (e: Exception) {
+            toast(e.message ?: "Invalid backup")
         }
     }
 
