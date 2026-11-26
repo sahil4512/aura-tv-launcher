@@ -321,13 +321,16 @@ service. The app you are watching is never touched, and neither are system apps.
 difference on TVs with little memory. It has no effect on Android 14 and newer, which don't allow it.
 
 **Backup:** Settings → System → Back Up Settings saves your setup as `YYYYMMDD_aura-backup.json`
-(for example `20261126_aura-backup.json`), either on the TV or in a shared folder on your network
-(a computer or NAS, SMB 2/3). *Restore From Backup* lists the backups there, newest first, and reads
-the one you pick back in, for example after reinstalling or on a second TV. A second backup on the
+(for example `20261126_aura-backup.json`): on the TV, on a USB drive or SD card, or in a shared folder
+on your network (a computer or NAS, SMB 2/3). *Restore From Backup* lists the backups there, newest
+first, and reads the one you pick back in, for example after reinstalling or on a second TV. On a USB
+drive or SD card the backup goes to `AuraTV` at the top of the drive when the TV allows it, otherwise
+to GlowHome's own folder there (`Android/data/com.auratv.launcher/files`); restore looks in both and
+at the top of the drive. A second backup on the
 same day replaces that day's file; `aura-backup.json` from earlier versions is still offered.
 
-For a network share, GlowHome lists the computers and NAS it finds on your network (or type the
-address, such as `192.168.1.10` or `\\NAS\Backups`), then the shared folders. When a share asks for a
+For a network share, GlowHome searches your network and lists the computers and NAS it finds, A–Z
+(or choose *Enter Address*, such as `192.168.1.10` or `\\NAS\Backups`), then the shared folders. When a share asks for a
 user name and password, *Remember this login* keeps them for next time: they are stored separately
 from your settings (so a backup never contains them) and, on Android 6 and newer, encrypted with a
 key kept in the Android Keystore. A saved login can be forgotten from the server's page.

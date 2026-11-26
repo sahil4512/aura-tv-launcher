@@ -1,9 +1,11 @@
 package com.auratv.launcher.backup
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Handler
 import android.util.Log
 import java.io.IOException
@@ -79,11 +81,12 @@ class SmbDiscovery(context: Context, private val ui: Handler, private val listen
             Log.w(TAG, "multicast lock: $e")
         }
         startMdns(gen)
+        val net = localNet(app)
         try {
             p.execute {
                 val wsd = Thread({ probeWsd(gen) }, "smb-wsd")
                 wsd.start()
-                scanSubnet(gen, p)
+                if (net != null) scanSubnet(gen, p, net)
                 try {
                     wsd.join(WSD_MS + 2000)
                     Thread.sleep((MDNS_MS - WSD_MS).coerceAtLeast(0)) // mDNS runs a little longer
@@ -233,8 +236,7 @@ class SmbDiscovery(context: Context, private val ui: Handler, private val listen
 
     // ------------------------------------------------------------ port scan
 
-    private fun scanSubnet(gen: Int, p: ExecutorService) {
-        val net = localNet() ?: return
+    private fun scanSubnet(gen: Int, p: ExecutorService, net: Pair<Int, Int>) {
         val hosts = scanTargets(net.first, net.second)
         val left = CountDownLatch(hosts.size)
         for (h in hosts) {
@@ -277,15 +279,26 @@ class SmbDiscovery(context: Context, private val ui: Handler, private val listen
                 "<wsd:Types>wsdp:Device</wsd:Types>" +
                 "</wsd:Probe></soap:Body></soap:Envelope>"
 
-        /** Own IPv4 address and prefix length (first up, non-loopback interface), or null. */
-        private fun localNet(): Pair<Int, Int>? {
+        /**
+         * Own IPv4 address and prefix length: of the active network (Android 6+), else of the first
+         * Wi-Fi / Ethernet interface that is up, else of any up, non-loopback interface; or null.
+         */
+        private fun localNet(ctx: Context): Pair<Int, Int>? {
+            if (Build.VERSION.SDK_INT >= 23) {
+                try {
+                    val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                    val lp = cm?.activeNetwork?.let { cm.getLinkProperties(it) }
+                    lp?.linkAddresses?.firstOrNull { it.address is Inet4Address }?.let { return toInt(it.address) to it.prefixLength }
+                } catch (e: Exception) {
+                    Log.w(TAG, "network: $e")
+                }
+            }
             try {
-                for (ni in NetworkInterface.getNetworkInterfaces() ?: return null) {
-                    if (!ni.isUp || ni.isLoopback) continue
-                    for (ia in ni.interfaceAddresses) {
-                        val a = ia.address
-                        if (a is Inet4Address && !a.isLinkLocalAddress) return toInt(a) to ia.networkPrefixLength.toInt()
-                    }
+                val up = (NetworkInterface.getNetworkInterfaces() ?: return null).toList().filter { it.isUp && !it.isLoopback }
+                val ordered = up.filter { it.name.startsWith("wlan") || it.name.startsWith("eth") } + up
+                for (ni in ordered) for (ia in ni.interfaceAddresses) {
+                    val a = ia.address
+                    if (a is Inet4Address && !a.isLinkLocalAddress) return toInt(a) to ia.networkPrefixLength.toInt()
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "network: $e")

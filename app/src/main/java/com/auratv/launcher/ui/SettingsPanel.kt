@@ -23,6 +23,7 @@ import com.auratv.launcher.BuildConfig
 import com.auratv.launcher.R
 import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.backup.BackupNames
+import com.auratv.launcher.backup.LocalStorage
 import com.auratv.launcher.backup.SmbClient
 import com.auratv.launcher.backup.SmbDiscovery
 import com.auratv.launcher.backup.SmbLogins
@@ -710,24 +711,32 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
     }
 
     private fun backupPage() = Page("Back Up Settings") {
-        listOf(
-            Action("This TV", "Saves ${BackupNames.forDate()} in ${activity.backupDir().path}") { activity.backupSettings() },
-            Nav("Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = true)) },
-        )
+        val items = ArrayList<Item>()
+        items += Section("Local Storage")
+        for (pl in LocalStorage.places(ctx, activity.backupDir())) {
+            items += Action(pl.label, "Saves ${BackupNames.forDate()} · ${pl.detail}") { activity.backupTo(pl) }
+        }
+        items += Section("Network")
+        items += Nav("Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = true)) }
+        items
     }
 
     private fun restorePage() = Page("Restore From Backup") {
-        listOf(
-            Nav("This TV", { "Backups in ${activity.backupDir().path}" }) { activity.withStoragePermission { push(localRestorePage()) } },
-            Nav("Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = false)) },
-        )
+        val items = ArrayList<Item>()
+        items += Section("Local Storage")
+        for (pl in LocalStorage.places(ctx, activity.backupDir())) {
+            items += Nav(pl.label, { pl.detail }) { activity.withStoragePermission { push(localRestorePage(pl)) } }
+        }
+        items += Section("Network")
+        items += Nav("Network Share", { "A shared folder on a computer or NAS" }) { push(networkPage(backup = false)) }
+        items
     }
 
-    private fun localRestorePage() = Page("This TV") {
-        val files = activity.localBackups()
-        if (files.isEmpty()) listOf(Info("No backups found in ${activity.backupDir().path}.", ""))
+    private fun localRestorePage(pl: LocalStorage.Place) = Page(pl.label) {
+        val files = LocalStorage.backups(pl)
+        if (files.isEmpty()) listOf(Info("No backups found on ${pl.label} (${pl.detail}).", ""))
         else files.map { f ->
-            Pick(f.name, backupDetail(f.lastModified(), f.length()), false, null) {
+            Pick(f.name, backupDetail(f.lastModified(), f.length()) + " · " + (f.parent ?: ""), false, null) {
                 confirmRestore(f.name) { activity.restoreFile(f) }
             }
         }
@@ -744,39 +753,41 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
 
     private fun loginLabel(l: SmbLogins.Login?) = if (l == null || l.guest) "Guest" else l.user
 
-    /** Servers: last folder, typed address, saved logins and what discovery finds on the network. */
+    /**
+     * Like CoreELEC Installer's share browser: what the search is doing, "Enter Address", then
+     * every server found on the network (A–Z; hosts with a saved login are listed too).
+     */
     private fun networkPage(backup: Boolean): Page {
         val d = discovery ?: SmbDiscovery(ctx, Bg.main, object : SmbDiscovery.Listener {
             override fun onServer(s: SmbDiscovery.Server) { if (stack.lastOrNull() === networkPage) refreshIfShown() }
             override fun onFinished() { if (stack.lastOrNull() === networkPage) refreshIfShown() }
         }).also { discovery = it }
         if (!d.running) d.start()
-        val page = Page(if (backup) "Back Up to a Network Share" else "Restore From a Network Share") {
+        val page = Page("Network Shares") {
             val items = ArrayList<Item>()
-            logins.lastFolder?.let { url ->
-                items += Nav("Last Used Folder", { SmbClient.displayPath(url) }) { push(folderPage(url, backup)) }
-            }
-            items += Action("Enter Server Address", "For example 192.168.1.10 or \\\\NAS\\Backups") { askAddress(backup) }
+            val found = d.servers()
             val saved = logins.saved()
-            val shown = HashSet<String>()
-            if (saved.isNotEmpty()) {
-                items += Section("Saved Logins")
-                for (sv in saved) {
-                    shown += sv.host.lowercase()
-                    items += Nav(sv.name ?: sv.host, { (if (sv.name != null) sv.host + " · " else "") + loginLabel(sv.login) }) {
-                        push(sharesPage(sv.host, sv.name, backup))
-                    }
-                }
+            items += Info(when {
+                d.running -> "Searching the network…"
+                found.isEmpty() -> "No servers found. Use \u201cEnter Address\u201d."
+                else -> "Search finished."
+            }, "")
+            items += Action("Enter Address", "For example 192.168.1.10 or \\\\NAS\\Backups") { askAddress(backup) }
+            class Row(val host: String, val label: String, val sub: String?, val name: String?)
+            val rows = ArrayList<Row>()
+            val hosts = HashSet<String>()
+            for (s in found) {
+                hosts += s.ip
+                rows += Row(s.ip, s.label, (if (s.name != null) s.ip else null).let { ip ->
+                    if (logins.isSaved(s.ip)) listOfNotNull(ip, "saved login").joinToString(" · ") else ip
+                }, s.name)
             }
-            items += Section("On Your Network")
-            val found = d.servers().filter { it.ip.lowercase() !in shown }
-            for (s in found) items += Nav(s.label, { if (s.name != null) s.ip else null }) { push(sharesPage(s.ip, s.name, backup)) }
-            if (d.running) {
-                items += Info("Looking for computers and NAS with shared folders…", "")
-            } else {
-                if (found.isEmpty()) items += Info("Nothing found. Enter the address instead, or check that file sharing is on.", "")
-                items += Action("Search Again") { d.start(); reload() }
+            for (sv in saved) if (sv.host !in hosts) {
+                rows += Row(sv.host, sv.name ?: sv.host, listOfNotNull(sv.host.takeIf { sv.name != null }, "saved login").joinToString(" · "), sv.name)
             }
+            rows.sortWith(compareBy<Row, String>(String.CASE_INSENSITIVE_ORDER) { it.label }.thenBy { it.host })
+            for (r in rows) items += Nav(r.label, { r.sub }) { push(sharesPage(r.host, r.name, backup)) }
+            if (!d.running) items += Action("Search Again") { d.start(); reload() }
             items
         }
         networkPage = page
@@ -844,7 +855,7 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
                 } else {
                     if (files.isEmpty()) items += Info("No backups in this folder.", "")
                     for (f in files) items += Pick(f.name, backupDetail(f.time, f.size), false, null) {
-                        confirmRestore(f.name) { restoreFromShare(url, f.url) }
+                        confirmRestore(f.name) { restoreFromShare(f.url) }
                     }
                 }
                 if (dirs.isNotEmpty()) {
@@ -878,24 +889,20 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
                     activity.toast("Couldn't save the backup: ${SmbClient.describe(err)}")
                     return@post
                 }
-                logins.lastFolder = folder
                 activity.toast("Backed up to ${SmbClient.displayPath(folder + name)}")
                 if (stack.size > 1 && activity.isTopOverlay(this)) replaceTop(folderPage(folder, backup = true))
             }
         }
     }
 
-    private fun restoreFromShare(folder: String, fileUrl: String) {
+    private fun restoreFromShare(fileUrl: String) {
         val login = logins.get(SmbClient.hostOf(fileUrl))
         val name = fileUrl.substringAfterLast('/')
         activity.toast("Reading $name…")
         Bg.net.execute {
             val r = try { Result.success(SmbClient.readText(SmbClient.context(login), fileUrl)) } catch (e: Exception) { Result.failure(e) }
             Bg.main.post {
-                r.onSuccess { text ->
-                    logins.lastFolder = folder
-                    activity.restoreText(text, name)
-                }.onFailure { activity.toast("Couldn't read $name: ${SmbClient.describe(it)}") }
+                r.onSuccess { text -> activity.restoreText(text, name) }.onFailure { activity.toast("Couldn't read $name: ${SmbClient.describe(it)}") }
             }
         }
     }

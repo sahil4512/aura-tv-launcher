@@ -31,6 +31,7 @@ import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.apps.AppRepository
 import com.auratv.launcher.apps.RecentApps
 import com.auratv.launcher.backup.BackupNames
+import com.auratv.launcher.backup.LocalStorage
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.DefaultHomePolicy
 import com.auratv.launcher.redirect.HomeRedirect
@@ -1266,21 +1267,18 @@ class MainActivity : Activity() {
         return getExternalFilesDir(null) ?: filesDir
     }
 
-    /** Backups on the TV (YYYYMMDD_aura-backup.json, and aura-backup.json of 0.7.0 and earlier), newest first. */
-    fun localBackups(): List<File> {
-        val files = backupDir().listFiles { f -> f.isFile && BackupNames.isBackup(f.name) }?.toList() ?: emptyList()
-        return BackupNames.newestFirst(files, { it.name }, { it.lastModified() })
-    }
-
     fun backupJson(): String = prefs.toJson().toString(2)
 
-    /** Saves YYYYMMDD_aura-backup.json on the TV (a second backup on the same day replaces the first). */
-    fun backupSettings() = withStoragePermission {
-        val f = File(backupDir(), BackupNames.forDate())
+    /**
+     * Saves YYYYMMDD_aura-backup.json on the TV or a USB drive / SD card (a second backup on the
+     * same day replaces the first).
+     */
+    fun backupTo(place: LocalStorage.Place) = withStoragePermission {
+        val name = BackupNames.forDate()
         val json = backupJson()
         Bg.apps.execute {
-            val ok = try { f.parentFile?.mkdirs(); f.writeText(json); true } catch (e: Exception) { false }
-            Bg.main.post { toast(if (ok) "Backed up to ${f.path}" else "Couldn't write ${f.path}") }
+            val f = try { LocalStorage.write(place, name, json) } catch (e: Exception) { null }
+            Bg.main.post { toast(if (f != null) "Backed up to ${f.path}" else "Couldn't write $name to ${place.label}") }
         }
     }
 

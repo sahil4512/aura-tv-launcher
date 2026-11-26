@@ -23,7 +23,7 @@ import org.json.JSONObject
  * logins live in their own file ("smb_logins"), never in the settings file, so a settings backup
  * never carries a password. On Android 6+ the password is encrypted with an AES key that never
  * leaves the Android Keystore; Android 5.1 has no usable Keystore AES, so there it is stored
- * as is (the file is private to GlowHome either way). The last folder used is remembered too.
+ * as is (the file is private to GlowHome either way).
  */
 class SmbLogins(context: Context) {
 
@@ -70,11 +70,6 @@ class SmbLogins(context: Context) {
         val name = try { JSONObject(sp.getString(k, "{}")!!).optString("n").ifEmpty { null } } catch (_: Exception) { null }
         Saved(host, name, l)
     }.sortedBy { (it.name ?: it.host).lowercase() }
-
-    /** smb:// URL of the folder used last (backup or restore), or null. */
-    var lastFolder: String?
-        get() = sp.getString(KEY_LAST, null)
-        set(v) { sp.edit().putString(KEY_LAST, v).apply() }
 
     private fun load(host: String): Login? {
         val v = sp.getString(PREFIX + key(host), null) ?: return null
@@ -130,7 +125,6 @@ class SmbLogins(context: Context) {
         private const val TAG = "Aura"
         private const val FILE = "smb_logins"
         private const val PREFIX = "login."
-        private const val KEY_LAST = "last_folder"
         private const val KEY_ALIAS = "glowhome_smb_logins"
         /** Logins typed in this session (until the launcher process ends). */
         private val session = ConcurrentHashMap<String, Login>()
