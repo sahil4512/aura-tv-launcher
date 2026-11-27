@@ -19,6 +19,7 @@ object HomeRedirect {
     const val ACTION_APPLY = "com.auratv.launcher.redirect.APPLY"
     const val ACTION_STOP = "com.auratv.launcher.redirect.STOP"
     const val ACTION_ALLOW_AMAZON = "com.auratv.launcher.redirect.ALLOW_AMAZON"
+    const val ACTION_HIDE_COVER = "com.auratv.launcher.redirect.HIDE_COVER"
 
     val HIJACK_PACKAGES = listOf("local.firetv.launcherhijack", "com.baronkiko.launcherhijack")
 
@@ -37,13 +38,15 @@ object HomeRedirect {
         val homePackage: String = RedirectPolicy.AMAZON_LAUNCHER,
         val mappings: Map<String, String> = emptyMap(),
         val kidsMode: Boolean = false,
+        /** Draw a full-screen cover over Amazon Home until GlowHome is up (needs the overlay app-op). */
+        val cover: Boolean = false,
     ) {
         val watching get() = enabled || mappings.isNotEmpty()
 
         fun toIntent(i: Intent): Intent = i
             .putExtra("enabled", enabled).putExtra("active", activeIntervalMs).putExtra("idle", idleIntervalMs)
             .putExtra("bypass", bypassDoublePress).putExtra("resident", resident).putExtra("instant", instantMode)
-            .putExtra("home", homePackage).putExtra("kids", kidsMode)
+            .putExtra("home", homePackage).putExtra("kids", kidsMode).putExtra("cover", cover)
             .putStringArrayListExtra("mappings", ArrayList(mappings.map { (src, dst) -> "$src=$dst" }))
 
         companion object {
@@ -61,6 +64,7 @@ object HomeRedirect {
                     homePackage = testHome(p) ?: RedirectPolicy.AMAZON_LAUNCHER,
                     mappings = AppRemaps.decode(p.buttonMappings).filterValues { !kids || it in allowed },
                     kidsMode = kids,
+                    cover = p.redirectCover,
                 )
             }
 
@@ -69,6 +73,7 @@ object HomeRedirect {
                 i.getBooleanExtra("bypass", true), i.getBooleanExtra("resident", true), i.getBooleanExtra("instant", false),
                 i.getStringExtra("home") ?: RedirectPolicy.AMAZON_LAUNCHER,
                 AppRemaps.decode(i.getStringArrayListExtra("mappings").orEmpty()), i.getBooleanExtra("kids", false),
+                i.getBooleanExtra("cover", false),
             )
         }
     }
@@ -151,4 +156,12 @@ object HomeRedirect {
     }
 
     fun usageAccessCommand(ctx: Context) = "adb shell appops set ${ctx.packageName} GET_USAGE_STATS allow"
+
+    fun overlayCommand(ctx: Context) = "adb shell appops set ${ctx.packageName} SYSTEM_ALERT_WINDOW allow"
+
+    /** Called by the UI once a redirect has drawn GlowHome: removes the cover in the ":redirect" process. */
+    fun hideCover(ctx: Context) {
+        if (!RedirectRuntime.serviceActive && !(Prefs(ctx).redirectEnabled && Prefs(ctx).redirectCover)) return
+        try { ctx.startService(Intent(ctx, HomeRedirectService::class.java).setAction(ACTION_HIDE_COVER)) } catch (_: Exception) {}
+    }
 }

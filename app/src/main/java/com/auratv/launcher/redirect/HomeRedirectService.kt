@@ -88,6 +88,11 @@ class HomeRedirectService : Service() {
                 if (!started) { stopSelfIfDisabled(); }
                 return START_STICKY
             }
+            HomeRedirect.ACTION_HIDE_COVER -> {
+                CoverOverlay.hide("GlowHome shown", CoverOverlay.HIDE_AFTER_ARRIVAL_MS)
+                if (started) return START_STICKY
+                // Not running (process was restarted): fall through and load the saved settings.
+            }
         }
         // Explicit config from the UI, or (sticky restart / boot) the saved preferences.
         val cfg = intent?.let { HomeRedirect.Config.from(it) } ?: HomeRedirect.Config.from(this, Prefs(this))
@@ -222,6 +227,7 @@ class HomeRedirectService : Service() {
     }
 
     private fun shutdown() {
+        CoverOverlay.hide("redirect stopped")
         handler.removeCallbacks(pollRunnable)
         handler.removeCallbacks(recheckRunnable)
         RedirectRuntime.serviceActive = false

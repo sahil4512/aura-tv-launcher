@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Hide Amazon Home While Switching** (Fire TV, off by default, in Home Button settings). When the redirect sees Amazon Home, GlowHome covers it with its own "Opening GlowHome…" screen until GlowHome has drawn, instead of showing Amazon Home during Fire OS's switch delay. Needs overlay access granted once over ADB (`appops set com.auratv.launcher SYSTEM_ALERT_WINDOW allow`; `tools/aura-setup` grants it with usage access). Key presses during the cover are swallowed so nothing on the hidden Amazon screen opens; Back removes the cover, and it always drops after 7 s. Idea borrowed from Launcher Manager Mini's overlay approach. Not yet verified on Fire TV hardware.
+
 ## 0.8.0 — Kids mode and button remapping (release candidate)
 
 - Remote Buttons has separate setup paths for a button pressed on GlowHome and a button that opens a branded app. You can test a direct shortcut before saving it and restore the original action later. Settings sections also open when clicked with a pointer.

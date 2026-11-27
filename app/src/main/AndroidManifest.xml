@@ -28,6 +28,9 @@
     <!-- Home-button redirect + "Recently used" row. Granted once over ADB on Fire TV
          (adb shell appops set com.auratv.launcher GET_USAGE_STATS allow). -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <!-- Optional Home-redirect cover drawn over Amazon Home while switching (off by default). Granted
+         once over ADB on Fire TV. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

@@ -76,6 +76,7 @@ class Prefs(context: Context) {
     var redirectDoublePress by bool("redirect_double_press", true)
     var redirectResident by bool("redirect_resident", true)
     var redirectInstant by bool("redirect_instant", false)
+    var redirectCover by bool("redirect_cover", false)
     var redirectLog by list("redirect_log")
     var showSystemApps by bool("system_apps", false)
     var autoAddNew by bool("auto_add", true)

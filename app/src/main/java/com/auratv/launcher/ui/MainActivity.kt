@@ -1032,6 +1032,7 @@ class MainActivity : Activity() {
         val source = i.getStringExtra(HomeRedirect.EXTRA_SOURCE) ?: "?"
         i.removeExtra(HomeRedirect.EXTRA_DETECTED_AT)
         window.decorView.post {
+            HomeRedirect.hideCover(this)
             val shown = System.currentTimeMillis()
             val total = shown - detectedAt
             val detect = requestedAt - detectedAt

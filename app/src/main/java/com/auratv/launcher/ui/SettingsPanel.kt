@@ -22,6 +22,7 @@ import android.widget.TextView
 import com.auratv.launcher.BuildConfig
 import com.auratv.launcher.R
 import com.auratv.launcher.apps.AppOrdering
+import com.auratv.launcher.redirect.CoverOverlay
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.HomeRedirect
 import com.auratv.launcher.settings.AuraTheme
@@ -833,6 +834,11 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         if (!access) items += Info("Grant it once from a computer:\n${HomeRedirect.usageAccessCommand(ctx)}", "")
         items += Choice("Detection Speed", HomeRedirect.SPEED_NAMES, { p.redirectSpeed }, { p.redirectSpeed = it; applyRedirect() },
             "Fire OS holds app switches for about 5 s after Home; faster detection mainly helps after Back")
+        val overlay = CoverOverlay.permitted(ctx)
+        items += Toggle("Hide Amazon Home While Switching",
+            if (overlay) "Covers the Amazon screen until GlowHome opens · Back removes the cover"
+            else "Needs overlay permission, once from a computer:\n${HomeRedirect.overlayCommand(ctx)}",
+            { p.redirectCover }, { p.redirectCover = it; applyRedirect() })
         items += Toggle("Double-Press Home for Amazon Home", "Press Home again within 3 s of GlowHome appearing",
             { p.redirectDoublePress }, { p.redirectDoublePress = it; applyRedirect() })
         items += Toggle("Keep Running in Background", "Recommended on 1.5 GB devices", { p.redirectResident },
