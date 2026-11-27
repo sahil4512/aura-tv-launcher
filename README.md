@@ -30,7 +30,13 @@ Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 
 ![GlowHome TV home screen on a Fire TV](docs/home.png)
 
-## ✨ New in 0.8.0
+## ✨ New in 0.8.1
+
+| | |
+|---|---|
+| 🙈 **Hide Amazon Home** (Fire TV) | Turn on *Hide Amazon Home While Switching* and GlowHome covers Amazon's screen with "Opening GlowHome…" until it opens. Press Back on the cover to stay on Amazon Home. [How to set it up](#fire-tv) |
+
+**Also in 0.8.0:**
 
 | | |
 |---|---|
