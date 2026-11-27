@@ -30,12 +30,17 @@ object RedirectRuntime {
             .putExtra(HomeRedirect.EXTRA_SOURCE, source)
             .putExtra(HomeRedirect.EXTRA_DETECTED_AT, detectedAt)
             .putExtra(HomeRedirect.EXTRA_REQUESTED_AT, requestedAt)
-        try {
-            ctx.startActivity(i)
-            Log.i(TAG, "redirect ($source): requested ${requestedAt - detectedAt} ms after Amazon Home")
-        } catch (e: Exception) {
-            Log.w(TAG, "redirect failed", e)
+        val start: () -> Unit = {
+            try {
+                ctx.startActivity(i)
+                Log.i(TAG, "redirect ($source): requested ${requestedAt - detectedAt} ms after Amazon Home")
+            } catch (e: Exception) {
+                Log.w(TAG, "redirect failed", e)
+                if (config.cover) CoverOverlay.hide("redirect failed")
+            }
         }
+        // Cover first, so Amazon Home is hidden while Fire OS holds the switch back.
+        if (config.cover) CoverOverlay.show(ctx, start) else start()
     }
 
     const val TAG = "AuraRedirect"

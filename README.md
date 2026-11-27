@@ -30,7 +30,13 @@ Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 
 ![GlowHome TV home screen on a Fire TV](docs/home.png)
 
-## ✨ New in 0.8.0
+## ✨ New in 0.8.1
+
+| | |
+|---|---|
+| 🙈 **Hide Amazon Home** (Fire TV) | Turn on *Hide Amazon Home While Switching* and GlowHome covers Amazon's screen with "Opening GlowHome…" until it opens. Press Back on the cover to stay on Amazon Home. [How to set it up](#fire-tv) |
+
+**Also in 0.8.0:**
 
 | | |
 |---|---|
@@ -229,6 +235,14 @@ What to expect:
   Android: after Home is pressed, it holds back other apps from opening for 5 seconds. Every
   Fire TV launcher without root has the same delay. Backing out of an app to Amazon Home is
   redirected almost instantly (about 0.2 s).
+- **To hide Amazon Home during that wait,** grant overlay access once
+  (`adb -s <tv-ip>:5555 shell appops set com.auratv.launcher SYSTEM_ALERT_WINDOW allow`; `aura-setup`
+  does this with usage access) and turn on **Hide Amazon Home While Switching**. GlowHome then draws
+  its own "Opening GlowHome…" screen over Amazon Home as soon as it appears, until GlowHome opens.
+  Remote presses during the wait are ignored so nothing opens by accident; Back on the cover means
+  "stay on Amazon Home". On TVs that have a "Display over other apps" screen, GlowHome opens it when
+  you turn the option on; otherwise it shows the command above. Without the permission the option
+  simply does nothing.
 - **To get to Amazon Home on purpose,** press Home twice (within 3 seconds of GlowHome appearing), or
   use Settings → System → Home Button → *Open Amazon Home*.
 - **Amazon's own Settings screens are never redirected,** so you can still use them normally.

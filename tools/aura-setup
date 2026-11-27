@@ -392,7 +392,9 @@ def main():
     extras = []
     if info["fire_os"] and (args.grant_usage or ask("   Grant usage access so the Home button can open GlowHome?", False)):
         tv.sh(f"appops set {PKG} GET_USAGE_STATS allow")
-        extras.append("Usage access granted. Turn the redirect on in Aura: Settings → System → Home Button.")
+        # Only used if "Hide Amazon Home While Switching" is turned on.
+        tv.sh(f"appops set {PKG} SYSTEM_ALERT_WINDOW allow")
+        extras.append("Usage and overlay access granted. Turn the redirect on in Aura: Settings → System → Home Button.")
     if not info["fire_os"] and info["api"] >= 24 and \
             (args.set_home or ask("   Make GlowHome the Home app?", sys.stdin.isatty())):
         out = tv.sh(f"cmd package set-home-activity {ACTIVITY}")

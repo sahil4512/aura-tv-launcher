@@ -22,6 +22,7 @@ import android.widget.TextView
 import com.auratv.launcher.BuildConfig
 import com.auratv.launcher.R
 import com.auratv.launcher.apps.AppOrdering
+import com.auratv.launcher.redirect.CoverOverlay
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.HomeRedirect
 import com.auratv.launcher.settings.AuraTheme
@@ -807,6 +808,16 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
 
     private fun applyRedirect() = HomeRedirect.apply(ctx, p)
 
+    /** Overlay access: the system screen where the TV has one, otherwise the one-time ADB command. */
+    private fun askOverlayAccess() {
+        if (HomeRedirect.openOverlaySettings(activity)) return
+        activity.openOverlay(ConfirmOverlay(activity, "Allow GlowHome to cover Amazon Home",
+            "This TV has no on-screen switch for it. Run this once from a computer on the same network:\n\n" +
+                "${HomeRedirect.overlayCommand(ctx)}\n\nUntil then the cover stays off and Amazon Home shows as before. " +
+                "tools/aura-setup does this for you.",
+            listOf("OK" to { reload() })))
+    }
+
     private fun homeButtonPage() = Page("Home Button") {
         val items = ArrayList<Item>()
         if (!HomeRedirect.isFireOs(ctx)) {
@@ -833,7 +844,19 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         if (!access) items += Info("Grant it once from a computer:\n${HomeRedirect.usageAccessCommand(ctx)}", "")
         items += Choice("Detection Speed", HomeRedirect.SPEED_NAMES, { p.redirectSpeed }, { p.redirectSpeed = it; applyRedirect() },
             "Fire OS holds app switches for about 5 s after Home; faster detection mainly helps after Back")
-        items += Toggle("Double-Press Home for Amazon Home", "Press Home again within 3 s of GlowHome appearing",
+        val overlay = CoverOverlay.permitted(ctx)
+        items += Toggle("Hide Amazon Home While Switching",
+            when {
+                overlay -> "Covers the Amazon screen until GlowHome opens · Back stays on Amazon Home"
+                p.redirectCover -> "Off until overlay access is allowed (Amazon Home shows as before)"
+                else -> "Needs overlay access (asked when you turn this on)"
+            },
+            { p.redirectCover }) { on ->
+            p.redirectCover = on
+            applyRedirect()
+            if (on && !CoverOverlay.permitted(ctx)) askOverlayAccess()
+        }
+        items += Toggle("Double-Press Home for Amazon Home", "Press Home again within about 3 s of GlowHome appearing",
             { p.redirectDoublePress }, { p.redirectDoublePress = it; applyRedirect() })
         items += Toggle("Keep Running in Background", "Recommended on 1.5 GB devices", { p.redirectResident },
             { p.redirectResident = it; applyRedirect() })
