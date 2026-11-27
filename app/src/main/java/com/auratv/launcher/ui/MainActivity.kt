@@ -29,7 +29,6 @@ import com.auratv.launcher.AuraApp
 import com.auratv.launcher.apps.AppEntry
 import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.apps.AppRepository
-import com.auratv.launcher.apps.KeepLight
 import com.auratv.launcher.apps.RecentApps
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.DefaultHomePolicy
@@ -43,6 +42,7 @@ import com.auratv.launcher.wallpaper.WallpaperCatalog
 import com.auratv.launcher.wallpaper.DecodeSize
 import com.auratv.launcher.wallpaper.WallpaperController
 import com.auratv.launcher.wallpaper.WallpaperView
+import com.auratv.launcher.settings.BackupFiles
 import org.json.JSONObject
 import java.io.File
 
@@ -90,6 +90,8 @@ class MainActivity : Activity() {
     private var recentEntries: List<AppEntry> = emptyList()
     private var recentsToken = 0
 
+    private var consumedShortcut = KeyEvent.KEYCODE_UNKNOWN
+    private val remoteSetup get() = (overlays.lastOrNull() as? SettingsPanel)?.remoteButtons
     private val overlays = ArrayList<Overlay>()
     private var lastHomeFocus: View? = null
     private val cellCache = HashMap<String, TileCell>()
@@ -116,7 +118,10 @@ class MainActivity : Activity() {
 
     private val appsListener = AppRepository.Listener {
         val kids = kidsHome
-        if (kids != null) kids.bind() else { bindRows(); refreshRecents() }
+        if (kids != null) kids.bind() else {
+            rebuildHome()
+            refreshRecents()
+        }
     }
 
     // =====================================================================
@@ -183,6 +188,7 @@ class MainActivity : Activity() {
         // The Home-button service lives in its own process; (re)apply the saved configuration.
         HomeRedirect.apply(this, prefs)
         noteRedirectArrival(intent)
+        if (intent.action == Intent.ACTION_ALL_APPS) handleShortcut(RemoteKeys.APPS, true) else resumeButtonSetup(intent)
         // First start: offer to make Aura the Home app, once Home has drawn and settled.
         Bg.main.postDelayed(homePrompt, HOME_PROMPT_DELAY_MS)
     }
@@ -261,6 +267,7 @@ class MainActivity : Activity() {
         super.onStart()
         Bg.main.removeCallbacks(keepLight) // back on Home within a few seconds: leave everything as it was
         if (kidsHome != null) return
+        remoteSetup?.returned()
         wallpaper.onStart()
         noteUserActivity() // motion runs again for a while whenever Home comes back
         refreshRecents()
@@ -272,14 +279,9 @@ class MainActivity : Activity() {
         registerReceiver(netReceiver, android.content.IntentFilter(android.net.ConnectivityManager.CONNECTIVITY_ACTION))
     }
 
-    /** Runs a few seconds after Home is left, so the app being opened is already in front (and safe). */
     private val keepLight = Runnable {
-        val app = applicationContext
-        val current = if (kidsHome == null) repo.apps else null
-        Bg.apps.execute {
-            val packages = if (current == null) KeepLight.targetsFromDevice(app) else KeepLight.targets(current, app.packageName)
-            KeepLight.closeBackground(app, packages)
-        }
+        tiles.trimMemory()
+        thumbs.evictAll()
     }
 
     override fun onStop() {
@@ -287,6 +289,7 @@ class MainActivity : Activity() {
         if (prefs.keepTvLight) Bg.main.postDelayed(keepLight, 4_000)
         pin.dismiss()
         if (kidsHome != null) return
+        remoteSetup?.leaving()
         if (family.lockSettings) while (overlays.isNotEmpty()) closeOverlay(overlays.last(), animate = false)
         wallpaper.onStop()
         Bg.main.removeCallbacks(idleMotionPause)
@@ -340,6 +343,7 @@ class MainActivity : Activity() {
         repo.removeListener(appsListener)
         // Bg.main outlives the activity: a pending hourly tick would keep this instance alive after recreate().
         Bg.main.removeCallbacks(greetingTick)
+        Bg.main.removeCallbacks(keepLight)
         Bg.main.removeCallbacks(homePrompt)
         super.onDestroy()
     }
@@ -367,12 +371,28 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun resumeButtonSetup(intent: Intent): Boolean {
+        if (!intent.hasCategory(Intent.CATEGORY_HOME) || family.lockSettings || overlays.isNotEmpty()) return false
+        val started = prefs.triedButton.getOrNull(2)?.toLongOrNull() ?: prefs.buttonCaptureSince
+        if (System.currentTimeMillis() - started !in 0L..120_000L) return false
+        val panel = SettingsPanel(this)
+        openOverlay(panel)
+        panel.resumeRemoteSetup()
+        return true
+    }
+
     /** Home pressed (via Launcher Hijack or a real HOME intent) while Aura is already running. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         noteRedirectArrival(intent)
-        pin.dismiss()
+        // Fire OS can redeliver Home after Kids Home is visible and a parent has begun PIN entry.
         if (kidsHome != null) return
+        if (intent.action == Intent.ACTION_ALL_APPS) {
+            handleShortcut(RemoteKeys.APPS, true)
+            return
+        }
+        if (remoteSetup?.expectingReturn() == true || resumeButtonSetup(intent)) return
+        pin.dismiss()
         if (moveKey != null) endMove()
         while (overlays.isNotEmpty()) closeOverlay(overlays.last(), animate = false)
         focusHome()
@@ -633,7 +653,7 @@ class MainActivity : Activity() {
 
     /** Ambient glow in the focused card's own colour (computed once per app from its artwork). */
     private fun updateGlow(cell: TileCell) {
-        if (!wallpaper.isGlow) return
+        if (kidsHome != null || !wallpaper.isGlow) return
         val key = cellKey(cell)
         val c = glowColors[key] ?: run {
             val b = cell.tile.bitmap ?: return@run null
@@ -701,11 +721,7 @@ class MainActivity : Activity() {
         heroTitle.setTextColor(t.text)
         hint.setTextColor(Style.withAlpha(t.text, 205))
         listOf(chipApps, chipWifi, chipSettings).forEach { it.invalidate() }
-        dock.background = android.graphics.drawable.GradientDrawable().apply {
-            setColor(android.graphics.Color.argb(if (backdrop) 30 else 46, 255, 255, 255))
-            cornerRadius = 22f.dp
-            setStroke(1.dp, android.graphics.Color.argb(if (backdrop) 40 else 56, 255, 255, 255))
-        }
+        dock.background = Style.dockBackground(backdrop)
         appsHeader.setTextColor(Style.withAlpha(t.text, 205))
         recentsHeader.setTextColor(Style.withAlpha(t.text, 205))
         updateGreeting()
@@ -785,43 +801,6 @@ class MainActivity : Activity() {
             return c
         }
 
-        val favCells = favEntries.map { cellFor(it, true) }.toMutableList()
-        val add = addCell ?: TileCell(this, null, TileView.KIND_ADD).also { c ->
-            c.bindSize(w, h, false)
-            c.setOnClickListener { withSettingsAccess { openOverlay(AllAppsOverlay(this, pickFavorites = true)) } }
-            addCell = c
-        }
-        (add.parent as? ViewGroup)?.removeView(add)
-        favCells.add(add)
-
-        // Second row: recently used apps, ending with an "All Apps" card. With no recently used apps
-        // there is no near-empty second row: All Apps ends the favourites row instead.
-        val maxRecents = 7
-        val recents = if (prefs.showRecentsRow) recentEntries.filter { it.key !in hidden }.take(maxRecents) else emptyList()
-        val allCell = allAppsCell ?: TileCell(this, null, TileView.KIND_ALL_APPS).also { c ->
-            c.bindSize(rw, rh, true, innerLabel = true)
-            c.setOnClickListener { openAllApps() }
-            allAppsCell = c
-        }
-        val favAll = favAllAppsCell ?: TileCell(this, null, TileView.KIND_ALL_APPS).also { c ->
-            c.bindSize(w, h, false)
-            c.setOnClickListener { openAllApps() }
-            favAllAppsCell = c
-        }
-        (allCell.parent as? ViewGroup)?.removeView(allCell)
-        (favAll.parent as? ViewGroup)?.removeView(favAll)
-        if (recents.isEmpty()) {
-            favCells.add(favAll)
-            recentsRow.setCells(emptyList())
-            recentsHeader.visibility = View.GONE
-            recentsRow.visibility = View.GONE
-        } else {
-            recentsRow.setCells(recents.map { cellFor(it, false, "R:") } + allCell)
-            recentsHeader.visibility = View.VISIBLE
-            recentsRow.visibility = View.VISIBLE
-        }
-        favRow.setCells(favCells)
-
         if (prefs.homeGrid) {
             // Every app on Home: favourites first (in your order), then the rest.
             val favKeys = favEntries.map { it.key }.toHashSet()
@@ -837,19 +816,55 @@ class MainActivity : Activity() {
             grid.setCells(emptyList())
             grid.visibility = View.GONE
             favRow.visibility = View.VISIBLE
-        }
+            val favCells = favEntries.map { cellFor(it, true) }.toMutableList()
+            val add = addCell ?: TileCell(this, null, TileView.KIND_ADD).also { c ->
+                c.bindSize(w, h, false)
+                c.setOnClickListener { withSettingsAccess { openOverlay(AllAppsOverlay(this, pickFavorites = true)) } }
+                addCell = c
+            }
+            (add.parent as? ViewGroup)?.removeView(add)
+            favCells.add(add)
 
-        if (prefs.homeGrid) Unit else if (prefs.showAppsRow) {
-            val favKeys = favEntries.map { it.key }.toHashSet()
-            val others = AppOrdering.sortForAllApps(
-                AppOrdering.visible(all, hidden, prefs.showSystemApps).filter { it.key !in favKeys }, prefs.allAppsSort)
-            appsRow.setCells(others.map { cellFor(it, false) })
-            appsHeader.visibility = if (others.isEmpty()) View.GONE else View.VISIBLE
-            appsRow.visibility = if (others.isEmpty()) View.GONE else View.VISIBLE
-        } else {
-            appsRow.setCells(emptyList())
-            appsHeader.visibility = View.GONE
-            appsRow.visibility = View.GONE
+            // Second row: recently used apps, ending with an "All Apps" card. With no recently used apps
+            // there is no near-empty second row: All Apps ends the favourites row instead.
+            val maxRecents = 7
+            val recents = if (prefs.showRecentsRow) recentEntries.filter { it.key !in hidden }.take(maxRecents) else emptyList()
+            val allCell = allAppsCell ?: TileCell(this, null, TileView.KIND_ALL_APPS).also { c ->
+                c.bindSize(rw, rh, true, innerLabel = true)
+                c.setOnClickListener { openAllApps() }
+                allAppsCell = c
+            }
+            val favAll = favAllAppsCell ?: TileCell(this, null, TileView.KIND_ALL_APPS).also { c ->
+                c.bindSize(w, h, false)
+                c.setOnClickListener { openAllApps() }
+                favAllAppsCell = c
+            }
+            (allCell.parent as? ViewGroup)?.removeView(allCell)
+            (favAll.parent as? ViewGroup)?.removeView(favAll)
+            if (recents.isEmpty()) {
+                favCells.add(favAll)
+                recentsRow.setCells(emptyList())
+                recentsHeader.visibility = View.GONE
+                recentsRow.visibility = View.GONE
+            } else {
+                recentsRow.setCells(recents.map { cellFor(it, false, "R:") } + allCell)
+                recentsHeader.visibility = View.VISIBLE
+                recentsRow.visibility = View.VISIBLE
+            }
+            favRow.setCells(favCells)
+
+            if (prefs.showAppsRow) {
+                val favKeys = favEntries.map { it.key }.toHashSet()
+                val others = AppOrdering.sortForAllApps(
+                    AppOrdering.visible(all, hidden, prefs.showSystemApps).filter { it.key !in favKeys }, prefs.allAppsSort)
+                appsRow.setCells(others.map { cellFor(it, false) })
+                appsHeader.visibility = if (others.isEmpty()) View.GONE else View.VISIBLE
+                appsRow.visibility = if (others.isEmpty()) View.GONE else View.VISIBLE
+            } else {
+                appsRow.setCells(emptyList())
+                appsHeader.visibility = View.GONE
+                appsRow.visibility = View.GONE
+            }
         }
         positionColumn()
         cellCache.keys.retainAll(used)
@@ -1183,7 +1198,38 @@ class MainActivity : Activity() {
         Bg.main.postDelayed(idleMotionPause, IDLE_MOTION_PAUSE_MS)
     }
 
+    internal fun launchShortcut(pkg: String): Boolean {
+        if (family.active) return false
+        val app = repo.apps.firstOrNull { it.packageName == pkg }
+        if (app != null) return repo.launch(app, null)
+        toast("App unavailable")
+        return false
+    }
+
+    private fun handleShortcut(key: String, activate: Boolean): Boolean {
+        if (kidsHome != null || family.active) return key == RemoteKeys.APPS
+        if (remoteSetup?.handle(key, activate) == true) return true
+        if (overlays.isNotEmpty() || moveKey != null) return key == RemoteKeys.APPS
+        val pkg = com.auratv.launcher.redirect.AppRemaps.decode(prefs.homeButtonMappings)[key]
+        if (pkg != null) {
+            if (activate) launchShortcut(pkg)
+            return true
+        }
+        if (key != RemoteKeys.APPS) return false
+        if (activate) openAllApps()
+        return true
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_UP && event.keyCode == consumedShortcut && consumedShortcut != KeyEvent.KEYCODE_UNKNOWN) {
+            consumedShortcut = KeyEvent.KEYCODE_UNKNOWN
+            return true
+        }
+        val shortcut = RemoteKeys.id(event.keyCode)
+        if (shortcut != null && handleShortcut(shortcut, event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0)) {
+            if (event.action == KeyEvent.ACTION_DOWN) consumedShortcut = event.keyCode
+            return true
+        }
         if (kidsHome != null) return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_DOWN) noteUserActivity()
         if (moveKey != null && overlays.isEmpty()) {
@@ -1323,28 +1369,72 @@ class MainActivity : Activity() {
         return File(getExternalFilesDir(null) ?: filesDir, "aura-backup.json")
     }
 
-    fun backupSettings() = withStoragePermission {
-        val f = backupFile()
-        val json = prefs.toJson().toString(2)
-        Bg.apps.execute {
-            val ok = try { f.parentFile?.mkdirs(); f.writeText(json); true } catch (e: Exception) { false }
-            Bg.main.post { toast(if (ok) "Backed up to ${f.path}" else "Couldn't write ${f.path}") }
+    fun transferBackup(file: File, export: Boolean) {
+        val transfer = {
+            if (export) writeBackup(file.path) { BackupFiles.write(file, it) }
+            else readBackup { android.util.AtomicFile(file).openRead().use(BackupFiles::read) }
+        }
+        if (file == backupFile() && Build.VERSION.SDK_INT <= 28) withStoragePermission(transfer)
+        else transfer()
+    }
+
+    fun backupDocumentIntent(export: Boolean): Intent? {
+        val intent = Intent(if (export) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+        if (export) {
+            intent.type = "application/json"
+            intent.putExtra(Intent.EXTRA_TITLE, BackupFiles.NAME)
+        } else intent.type = "*/*"
+        val handlers = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            .map { it.activityInfo.packageName }.distinct().filterNot { it == "com.google.android.tv.frameworkpackagestubs" }
+        if (handlers.isEmpty()) return null
+        return if (handlers.size == 1) intent.setPackage(handlers.first()) else intent
+    }
+
+    fun pickBackupDocument(intent: Intent, export: Boolean) {
+        try {
+            startActivityForResult(intent, if (export) REQ_EXPORT else REQ_IMPORT)
+        } catch (_: RuntimeException) { toast("File picker unavailable. Use a connected USB drive.") }
+    }
+
+    @Deprecated("Android activity result callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK || requestCode !in setOf(REQ_EXPORT, REQ_IMPORT) || family.active) return
+        val uri = data?.data?.takeIf { it.scheme == "content" } ?: return
+        if (requestCode == REQ_EXPORT) writeBackup("selected file") { json ->
+            val output = contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open file")
+            output.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+        } else withSettingsAccess {
+            readBackup { contentResolver.openInputStream(uri)?.use(BackupFiles::read) ?: error("Cannot open file") }
         }
     }
 
-    fun restoreSettings() = withStoragePermission {
-        val f = backupFile()
+    private fun writeBackup(destination: String, write: (String) -> Unit) {
+        val json = prefs.toJson().toString(2)
         Bg.apps.execute {
-            val json = try { JSONObject(f.readText()) } catch (e: Exception) { null }
+            val result = runCatching { write(json) }
+            Bg.main.post { toast(if (result.isSuccess) "Saved to $destination" else "Backup failed: ${result.exceptionOrNull()?.message}") }
+        }
+    }
+
+    private fun readBackup(read: () -> JSONObject) {
+        Bg.apps.execute {
+            val result = runCatching { read() }
             Bg.main.post {
-                if (json == null) { toast("No backup found at ${f.path}"); return@post }
+                if (isFinishing || isDestroyed || family.active) return@post
                 try {
-                    val n = prefs.restoreJson(json)
-                    reloadEverything()
-                    toast("Restored $n settings")
-                } catch (e: Exception) {
-                    toast(e.message ?: "Invalid backup")
-                }
+                    val json = result.getOrThrow()
+                    require(json.optString("format") == "aura-tv-backup" && json.has("values")) { "Invalid GlowHome backup" }
+                    openOverlay(ConfirmOverlay(this, "Restore settings?", "Replace your current launcher settings with this backup?",
+                        listOf("Restore" to {
+                            try {
+                                val count = prefs.restoreJson(json)
+                                reloadEverything()
+                                toast("Restored $count settings")
+                            } catch (e: Exception) { toast(e.message ?: "Invalid backup") }
+                        }, "Cancel" to {})))
+                } catch (e: Exception) { toast(e.message ?: "Cannot read backup") }
             }
         }
     }
@@ -1375,6 +1465,8 @@ class MainActivity : Activity() {
         private const val IDLE_MOTION_PAUSE_MS = 45_000L
         private const val REQ_STORAGE = 7
         private const val REQ_WIFI_NAME = 8
+        private const val REQ_EXPORT = 10
+        private const val REQ_IMPORT = 11
         private const val REQ_HOME_ROLE = 9
         private const val HOME_PROMPT_DELAY_MS = 1_500L
         const val WIFI_NAME_HEADING = "Show your Wi-Fi name?"

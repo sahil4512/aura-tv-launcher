@@ -33,6 +33,7 @@ class TileView(context: Context) : View(context) {
     /** Recently-used style: the name sits inside the card over a soft bottom fade. */
     var innerLabel = false
         set(v) { field = v; invalidate() }
+    var focusRingColor: Int? = null
     var ringVisible = false
         set(v) { if (field != v) { field = v; invalidate() } }
     var moving = false
@@ -95,9 +96,9 @@ class TileView(context: Context) : View(context) {
         // Glass edge on every card; a crisp ring when focused.
         val r = t.cornerDp.dp
         if (ringVisible || moving) {
-            val rw = (if (moving) FocusSpec.movingRingDp(t.ringWidthDp) else FocusSpec.ringDp(t.ringWidthDp)).dp
+            val rw = if (focusRingColor != null) 4f.dp else (if (moving) FocusSpec.movingRingDp(t.ringWidthDp) else FocusSpec.ringDp(t.ringWidthDp)).dp
             stroke.strokeWidth = rw
-            stroke.color = if (moving) Style.accent else t.ring
+            stroke.color = if (moving) Style.accent else focusRingColor ?: t.ring
             tmp.set(rw / 2f, rw / 2f, w - rw / 2f, h - rw / 2f)
             c.drawRoundRect(tmp, r - rw / 2f, r - rw / 2f, stroke)
         } else {

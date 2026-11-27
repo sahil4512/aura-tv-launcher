@@ -14,6 +14,7 @@ with evidence; screenshots land in ``--out``. Focus is read from ``uiautomator d
 is switched off during the run so the window goes idle). Pixel checks use ffmpeg crops.
 """
 import argparse
+import hashlib
 import os
 import re
 import subprocess
@@ -24,7 +25,7 @@ import xml.etree.ElementTree as ET
 PKG = "com.auratv.launcher"
 FIX = "com.auratv.testfixture"
 ACT = PKG + "/.ui.MainActivity"
-SIDEBAR = ["Appearance", "Apps", "Layout", "System", "Kids Mode", "Button Remapping", "About"]
+SIDEBAR = ["Appearance", "Apps", "Layout", "System", "Kids Mode", "Remote Buttons", "About"]
 THEMES = ["Midnight", "Minimal Dark", "Soft Glass", "Cinematic", "Warm Ambient"]
 LONG_NAME = "Aurora Streaming Service with an Extremely Long Name"
 
@@ -113,12 +114,12 @@ class Dev:
     def prefs(self):
         return self.adb("shell", f"run-as {PKG} cat shared_prefs/aura_prefs.xml")
 
-    def write_prefs(self, xml):
+    def write_prefs(self, xml, store="aura_prefs"):
         tmp = os.path.join(self.out, "_prefs.xml")
         with open(tmp, "w") as f:
             f.write(xml)
         self.adb("push", tmp, "/data/local/tmp/aura_prefs.xml")
-        self.sh(f"run-as {PKG} sh -c 'cat /data/local/tmp/aura_prefs.xml > shared_prefs/aura_prefs.xml'")
+        self.sh(f"run-as {PKG} sh -c 'cat /data/local/tmp/aura_prefs.xml > shared_prefs/{store}.xml'")
 
     def pref(self, name):
         m = re.search(rf'name="{re.escape(name)}"(?: value="([^"]*)"\s*/>|>([^<]*)</string>)', self.prefs())
@@ -409,6 +410,52 @@ def allapps_checks(R):
     d.write_prefs(set_pref(d.prefs(), "string", "hidden", ""))  # later groups expect every app
 
 
+def kids_checks(R):
+    """Verify banner proportions and packing as a small Kids Home collection grows."""
+    d = R.d
+    seed(d)
+    d.stop()
+    d.write_prefs(set_pref(d.prefs(), "boolean", "home_grid", "true"))
+    # Preserve the emulator's family settings inside the app's own sandbox for this check.
+    family = "shared_prefs/family.xml"
+    backup = "cache/ui_check_family.xml"
+    saved = d.sh(f"run-as {PKG} ls {family}").strip() == family
+    if saved:
+        d.sh(f"run-as {PKG} cp {family} {backup}")
+    salt = bytes(16)
+    verifier = salt.hex() + "." + hashlib.pbkdf2_hmac("sha1", b"1234", salt, 60000, 32).hex()
+    sizes = []
+    try:
+        for total, expected_rows in [(3, [3]), (4, [4]), (5, [3, 2]), (6, [3, 3])]:
+            d.stop()
+            prefs = ET.Element("map")
+            ET.SubElement(prefs, "boolean", name="active", value="true")
+            ET.SubElement(prefs, "string", name="pin").text = verifier
+            allowed = ET.SubElement(prefs, "set", name="allowed")
+            for i in range(1, total + 1):
+                ET.SubElement(allowed, "string").text = f"{FIX}.app{i:02d}"
+            d.write_prefs(ET.tostring(prefs, encoding="unicode"), "family")
+            d.start()
+            root = d.tree()
+            boxes = [bounds(n) for n in root.iter("node") if n.get("clickable") == "true"
+                     and n.get("content-desc", "").startswith("Fixture App ")] if root is not None else []
+            row_tops = sorted({top for _, top, _, _ in boxes})
+            rows = [sum(top == y for _, top, _, _ in boxes) for y in row_tops]
+            R.check(f"K{total}", f"{total} approved apps form rows of {expected_rows}", rows == expected_rows, str(rows))
+            sizes.append({(r - l, b - t) for l, t, r, b in boxes})
+        # TileCell adds 22 dp to each dimension for the focus glow around the banner.
+        pad = d.dp(22)
+        R.check("K7", "three through six apps retain the same 16:9 banners",
+                all(size == sizes[0] for size in sizes) and len(sizes[0]) == 1 and
+                all(abs((w - pad) * 9 / 16 - (h - pad)) <= 1 for w, h in sizes[0]), str(sizes))
+    finally:
+        d.stop()
+        if saved:
+            d.sh(f"run-as {PKG} mv {backup} {family}")
+        else:
+            d.sh(f"run-as {PKG} rm -f {family}")
+
+
 def grid_checks(R):
     """Home's 4-column app grid: every app reachable with the remote, focus always fully visible."""
     d = R.d
@@ -631,6 +678,17 @@ def settings_checks(R):
     R.check("S43", "Settings chip opens the TV's own settings", "settings" in front.lower() and PKG not in front, front.strip()[-80:])
     d.key("BACK", wait=1.0)
     d.sh(f"am start -n {ACT}")
+    time.sleep(1)
+    d.key("BACK")
+    open_settings(d)
+    remote = d.find("Remote Buttons")
+    if remote:
+        l, t, r, b = remote
+        d.sh(f"input tap {(l + r) // 2} {(t + b) // 2}")
+        time.sleep(0.6)
+    R.check("S44", "clicking the Remote Buttons sidebar opens its choices",
+            "Redirect an app button" in d.texts())
+
     time.sleep(1.5)
 
 
@@ -697,7 +755,7 @@ def main():
     ap.add_argument("--apk")
     ap.add_argument("--fixture")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--only", default="grid,home,allapps,settings,animoff,lifecycle")
+    ap.add_argument("--only", default="grid,home,allapps,settings,animoff,lifecycle,kids")
     ap.add_argument("--display", help="emulate a display, e.g. 3840x2160@640 (reset afterwards)")
     a = ap.parse_args()
     if not re.fullmatch(r"emulator-\d+", a.serial):
@@ -725,14 +783,14 @@ def main():
     if home and home[-1].startswith((PKG, "android/")):  # Aura, or the chooser that can pick Aura
         cands = [l.strip() for l in d.sh("cmd package query-activities --brief -a android.intent.action.MAIN "
                                          "-c android.intent.category.HOME").splitlines() if "/" in l]
-        other = next((c for c in cands if not c.startswith((PKG, "com.android.settings", "android/"))), None)
+        other = next((c for c in cands if not c.startswith((PKG, "com.android.settings", "com.android.tv.settings", "android/"))), None)
         if other:
             print(f"temporarily setting Home to {other} (was {home[-1]})")
             d.sh(f"cmd package set-home-activity {other}")
             restore_home = home[-1] if home[-1].startswith(PKG) else None
     R = Run(d)
     groups = {"grid": grid_checks, "home": home_checks, "allapps": allapps_checks, "settings": settings_checks, "animoff": anim_off_checks,
-              "lifecycle": lifecycle_checks}
+              "lifecycle": lifecycle_checks, "kids": kids_checks}
     for g in a.only.split(","):
         try:
             groups[g](R)

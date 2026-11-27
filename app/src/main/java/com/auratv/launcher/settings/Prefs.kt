@@ -13,6 +13,9 @@ import kotlin.reflect.KProperty
 class Prefs(context: Context) {
     val sp: SharedPreferences = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
+    private val backupTypes = mutableMapOf("bg_solid_062" to "b", "profile_applied_v1" to "b",
+        "profile_label" to "s", "asked_wifi_name" to "b", "home_step_started" to "b")
+
     // Wallpaper
     var wallpaperType by str("wp_type", TYPE_SOLID)
     var wallpaperId by str("wp_id", DEFAULT_WALLPAPER)
@@ -38,6 +41,7 @@ class Prefs(context: Context) {
     var showTagline by bool("tagline", true)
     var iconSize by int("icon_size", 1)
     var showLabels by bool("labels", false)
+    var kidsScenery by int("kids_scenery", 0) // automatic, day, night
     var showClock by bool("clock", true)
     var clockFormat by int("clock_format", 0) // 0 system, 1 = 12h, 2 = 24h
     var showDate by bool("date", true)
@@ -47,8 +51,8 @@ class Prefs(context: Context) {
     var rowPosition by int("row_pos", 1) // 0 centred, 1 lower third
     /** Home shows every app in a 4-column grid (true) or one favourites row plus Recently Used (false). */
     var homeGrid by bool("home_grid", true)
-    /** Close other apps' background processes whenever Home is left for an app (see KeepLight). */
-    var keepTvLight by bool("keep_light", true)
+    /** Release launcher artwork caches after leaving Home. */
+    var keepTvLight by bool("keep_light", context.resources.getBoolean(com.auratv.launcher.R.bool.def_keep_tv_light))
 
     // Screensaver (Android starts it after the idle time set in its own Screen saver settings).
     var screensaverSource by int("ss_source", 0)
@@ -62,6 +66,10 @@ class Prefs(context: Context) {
 
     // Home button redirect (Fire OS). Off by default so it never competes with an existing helper.
     var redirectEnabled by bool("redirect_enabled", false)
+    var openAfterRestart by bool("open_after_restart", false)
+    var buttonCaptureSince by long("button_capture_since", 0)
+    var triedButton by list("tried_button")
+    var homeButtonMappings by list("home_button_mappings")
     var buttonMappings by list("button_mappings")
     var redirectSpeed by int("redirect_speed", 1)
     var redirectDoublePress by bool("redirect_double_press", true)
@@ -109,12 +117,16 @@ class Prefs(context: Context) {
     /** Returns the number of values restored. Throws on a file that is not an Aura backup. */
     fun restoreJson(root: JSONObject): Int {
         require(root.optString("format") == "aura-tv-backup") { "Not a GlowHome TV backup file" }
+        require(root.optInt("version", 1) == 1) { "Unsupported backup version" }
         val values = root.getJSONObject("values")
         val e = sp.edit()
         e.clear()
         var n = 0
         for (k in values.keys()) {
+            if (k in TRANSIENT_KEYS) continue
+            val type = backupTypes[k] ?: continue
             val o = values.getJSONObject(k)
+            require(o.getString("t") == type) { "Invalid value for $k" }
             when (o.getString("t")) {
                 "s" -> e.putString(k, o.getString("v"))
                 "i" -> e.putInt(k, o.getInt("v"))
@@ -139,25 +151,25 @@ class Prefs(context: Context) {
         override fun getValue(thisRef: Any, property: KProperty<*>) = sp.getString(key, def) ?: def
         override fun setValue(thisRef: Any, property: KProperty<*>, value: String) =
             sp.edit().putString(key, value).apply()
-    }
+    }.also { backupTypes[key] = "s" }
 
     private fun int(key: String, def: Int) = object : ReadWriteProperty<Any, Int> {
         override fun getValue(thisRef: Any, property: KProperty<*>) = sp.getInt(key, def)
         override fun setValue(thisRef: Any, property: KProperty<*>, value: Int) =
             sp.edit().putInt(key, value).apply()
-    }
+    }.also { backupTypes[key] = "i" }
 
     private fun long(key: String, def: Long) = object : ReadWriteProperty<Any, Long> {
         override fun getValue(thisRef: Any, property: KProperty<*>) = sp.getLong(key, def)
         override fun setValue(thisRef: Any, property: KProperty<*>, value: Long) =
             sp.edit().putLong(key, value).apply()
-    }
+    }.also { backupTypes[key] = "l" }
 
     private fun bool(key: String, def: Boolean) = object : ReadWriteProperty<Any, Boolean> {
         override fun getValue(thisRef: Any, property: KProperty<*>) = sp.getBoolean(key, def)
         override fun setValue(thisRef: Any, property: KProperty<*>, value: Boolean) =
             sp.edit().putBoolean(key, value).apply()
-    }
+    }.also { backupTypes[key] = "b" }
 
     /** Ordered string list stored newline-separated (keys never contain newlines). */
     private fun list(key: String) = object : ReadWriteProperty<Any, List<String>> {
@@ -166,7 +178,7 @@ class Prefs(context: Context) {
 
         override fun setValue(thisRef: Any, property: KProperty<*>, value: List<String>) =
             sp.edit().putString(key, value.joinToString("\n")).apply()
-    }
+    }.also { backupTypes[key] = "s" }
 
     companion object {
         const val FILE = "aura_prefs"
@@ -177,7 +189,7 @@ class Prefs(context: Context) {
         /** One flat colour: nothing to decode, animate or redraw (the default since 0.6.2). */
         const val TYPE_SOLID = "solid"
         const val DEFAULT_WALLPAPER = "asset:lake.jpg"
-        private val TRANSIENT_KEYS = setOf("known_apps", "wp_last_change", "redirect_log", "launch_history")
+        private val TRANSIENT_KEYS = setOf("button_capture_since", "tried_button", "known_apps", "wp_last_change", "redirect_log", "launch_history")
 
         val ROTATION_CHOICES = intArrayOf(0, 5, 15, 30, 60)
         val DIM_CHOICES = intArrayOf(0, 10, 20, 30, 40, 50, 60)

@@ -1,151 +1,246 @@
 package com.auratv.launcher.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
-import android.view.ViewGroup
-import android.widget.AbsListView
-import android.widget.BaseAdapter
 import android.widget.FrameLayout
-import android.widget.GridView
-import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextClock
 import android.widget.TextView
 import com.auratv.launcher.R
+import java.util.TimeZone
+import android.text.format.DateFormat
 import com.auratv.launcher.apps.AppEntry
 import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.util.dp
 import com.auratv.launcher.util.sizeDp
 
-/** Native TV focus and recycled cards. Only visible apps request artwork. */
-class KidsHome(private val activity: MainActivity) : LinearLayout(activity) {
-    private val gap = 12.dp
-    private val maxColumns = 4
-    private val available = resources.displayMetrics.widthPixels - 2 * activity.safeH
-    private val cardWidth = (available - (maxColumns - 1) * gap) / maxColumns
-    private val artWidth = cardWidth - 12.dp
-    private val artHeight = artWidth * 9 / 16
-    private val cardHeight = artHeight + 47.dp
-    private val exit = familyButton(activity, "Exit kids mode", compact = true)
-    private val body = FrameLayout(activity)
-    private var entries = emptyList<AppEntry>()
-    private var bound = false
-    private val cards = object : BaseAdapter() {
-        override fun getCount() = entries.size
-        override fun getItem(position: Int) = entries[position]
-        override fun getItemId(position: Int) = position.toLong()
-        override fun getView(position: Int, recycled: View?, parent: ViewGroup): View =
-            ((recycled as? Card) ?: Card()).apply { bind(getItem(position)) }
+/** The regular Home dock, scoped to the parent's approved apps. */
+class KidsHome(private val activity: MainActivity) : FrameLayout(activity) {
+    private val scenery = KidsScenery(activity)
+    private val clock = TextView(activity).apply {
+        typeface = Style.MEDIUM
+        sizeDp(32f)
+        includeFontPadding = false
+        visibility = if (activity.prefs.showClock) View.VISIBLE else View.GONE
     }
-    private val apps = GridView(activity).apply {
-        numColumns = maxColumns
-        stretchMode = GridView.NO_STRETCH
-        columnWidth = cardWidth
-        horizontalSpacing = gap
-        verticalSpacing = gap
-        isVerticalScrollBarEnabled = false
-        selector = familySurface(Style.accent, Color.TRANSPARENT, 15)
-        adapter = cards
-        setOnItemClickListener { _, card, position, _ -> activity.launch(entries[position], card) }
-        setOnKeyListener { _, code, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_UP &&
-                selectedItemPosition in 0 until numColumns) exit.requestFocus() else false
+    private val date = TextClock(activity).apply {
+        format12Hour = "EEEE, d MMMM"
+        format24Hour = format12Hour
+        isAllCaps = true
+        sizeDp(13f)
+        letterSpacing = .08f
+        includeFontPadding = false
+        visibility = if (activity.prefs.showDate) View.VISIBLE else View.GONE
+    }
+    private val exit = TextView(activity).apply {
+        text = "Grown-ups"
+        typeface = Style.MEDIUM
+        sizeDp(18f)
+        gravity = Gravity.CENTER
+        isFocusable = true
+        isClickable = true
+        setPadding(16.dp, 0, 16.dp, 0)
+        compoundDrawablePadding = 7.dp
+        setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_grownups, 0, 0, 0)
+    }
+    private var clockMinute = -1
+    private var use24Hours = false
+    private var dayScene: Boolean? = null
+    private val timeChanges = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != Intent.ACTION_TIME_TICK) clockMinute = -1
+            if (windowVisibility == View.VISIBLE) updateScene()
         }
     }
-    private val empty = TextView(activity).apply {
-        text = "No apps selected\nExit kids mode to choose apps."
-        gravity = Gravity.CENTER
-        sizeDp(20f)
-        setTextColor(Style.theme.textDim)
+    private val title = TextView(activity).apply {
+        sizeDp(36f)
+        typeface = Style.MEDIUM
+        setTextColor(Style.theme.text)
+        includeFontPadding = false
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setPadding(activity.safeH, 0, activity.safeH, 0)
     }
+    private val row = HomeRow(activity).apply {
+        spacing = 18.dp - TileCell.GLOW_PAD.dp
+        setPadding(18.dp, 18.dp, 18.dp, 0)
+        verticalExit = { direction, index -> if (direction == View.FOCUS_UP) exit else cellAt(index) }
+    }
+    private val grid = HomeGrid(activity).apply {
+        spacing = 18.dp - TileCell.GLOW_PAD.dp
+        rowGap = 18.dp
+        sidePadding = 18.dp
+        topPadding = 18.dp
+        upExit = { exit }
+    }
+    private val useGrid = activity.prefs.homeGrid
+    private val dock = if (useGrid) grid else row
+    private var entries: List<AppEntry>? = null
+    private var selected = 0
 
     init {
-        orientation = VERTICAL
-        setPadding(activity.safeH, activity.safeV, activity.safeH, activity.safeV)
-        background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Style.theme.placeholder, Style.theme.shade, Style.theme.shade))
-        val header = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(ImageView(activity).apply { setImageResource(R.drawable.ic_kids) }, LayoutParams(40.dp, 40.dp))
-        header.addView(TextView(activity).apply {
-            text = "Kids mode"
-            sizeDp(30f)
-            typeface = Style.MEDIUM
-            setTextColor(Style.theme.text)
-        }, LayoutParams(0, -2, 1f).apply { leftMargin = 12.dp })
+        addView(scenery, LayoutParams(-1, -1))
+        val timeBlock = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(clock)
+            addView(date, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
+        }
+        addView(timeBlock, LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
+            leftMargin = activity.safeH
+            topMargin = activity.safeV
+        })
+        addView(exit, LayoutParams(-2, 44.dp, Gravity.TOP or Gravity.END).apply {
+            rightMargin = activity.safeH
+            topMargin = activity.safeV
+        })
         exit.setOnClickListener { activity.exitKidsMode() }
         exit.setOnKeyListener { _, code, event ->
-            if (code == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN && entries.isNotEmpty())
-                apps.requestFocus() else false
+            code == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN &&
+                cellAt(selected)?.requestFocus() == true
         }
-        header.addView(exit, LayoutParams(138.dp, 40.dp))
-        addView(header)
-        body.addView(apps)
-        body.addView(empty, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
-        addView(body, LayoutParams(-1, 0, 1f).apply { topMargin = 18.dp })
+        val column = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        column.addView(title, LinearLayout.LayoutParams(-1, -2))
+        dock.clipToOutline = true
+        column.addView(dock, LinearLayout.LayoutParams(-1, LayoutParams.WRAP_CONTENT).apply {
+            leftMargin = activity.safeH - 18.dp
+            rightMargin = leftMargin
+            topMargin = 14.dp
+        })
+        addView(column, LayoutParams(-1, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = (resources.displayMetrics.heightPixels *
+                (if (useGrid || activity.prefs.rowPosition != 0) 0.29f else 0.27f)).toInt()
+            bottomMargin = activity.safeV
+        })
     }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        activity.registerReceiver(timeChanges, IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        })
+        updateScene()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (hasWindowFocus && findFocus() == null) (cellAt(selected) ?: exit).requestFocusFromTouch()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == View.VISIBLE && isAttachedToWindow) updateScene()
+    }
+
+    override fun onDetachedFromWindow() {
+        activity.unregisterReceiver(timeChanges)
+        dayScene = null
+        background = null
+        super.onDetachedFromWindow()
+    }
+
+    private fun surface(color: Int, radius: Int) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = radius.dp.toFloat()
+    }
+
+    private fun updateScene() {
+        val now = System.currentTimeMillis()
+        val minute = (((now + TimeZone.getDefault().getOffset(now)) / 60_000L) % 1440).toInt()
+        val hour = minute / 60
+        if (clock.visibility == View.VISIBLE && minute != clockMinute) {
+            if (clockMinute < 0) use24Hours = when (activity.prefs.clockFormat) {
+                1 -> false
+                2 -> true
+                else -> DateFormat.is24HourFormat(activity)
+            }
+            clockMinute = minute
+            val mm = (minute % 60).toString().padStart(2, '0')
+            clock.text = if (use24Hours) "${hour.toString().padStart(2, '0')}:$mm" else
+                "${(hour + 11) % 12 + 1}:$mm ${if (hour < 12) "AM" else "PM"}"
+        }
+        val day = when (activity.prefs.kidsScenery) {
+            1 -> true
+            2 -> false
+            else -> hour in 6 until 18
+        }
+        if (day == dayScene) return
+        dayScene = day
+        val ink = if (day) NAVY else Color.WHITE
+        title.setTextColor(ink)
+        clock.setTextColor(ink)
+        date.setTextColor(Style.withAlpha(ink, 210))
+        val focusState = intArrayOf(android.R.attr.state_focused)
+        exit.background = StateListDrawable().apply {
+            addState(focusState, surface(GOLD, 24))
+            addState(intArrayOf(), surface(if (day) 0xeef6f9ff.toInt() else 0xff282840.toInt(), 24))
+        }
+        val inks = android.content.res.ColorStateList(arrayOf(focusState, intArrayOf()), intArrayOf(NAVY, ink))
+        exit.setTextColor(inks)
+        exit.compoundDrawablesRelative[0]?.setTintList(inks)
+        dock.background = surface(if (day) 0x4040749a else 0xb528294c.toInt(), 22)
+        scenery.day = day
+    }
+
+    private companion object {
+        val NAVY = 0xff111338.toInt()
+        val GOLD = 0xffffc526.toInt()
+    }
+
+    private fun cellAt(index: Int) = if (useGrid) grid.cellAt(index) else row.cellAt(index)
 
     fun bind() {
         val allowed = activity.family.allowed
         val next = AppOrdering.sortForAllApps(activity.repo.apps.filter { it.packageName in allowed }, 0)
-        if (bound && next == entries) return
-        val selected = entries.getOrNull(apps.selectedItemPosition)?.packageName
-        val keepExit = entries.isNotEmpty() && exit.isFocused
-        bound = true
+        if (entries == next) return
+        val previous = entries?.getOrNull(selected)?.packageName
+        val keepExit = exit.isFocused && !entries.isNullOrEmpty()
         entries = next
-        cards.notifyDataSetChanged()
-        val columns = entries.size.coerceIn(1, maxColumns)
-        apps.numColumns = columns
-        val shortRow = entries.size <= maxColumns
-        apps.layoutParams = FrameLayout.LayoutParams(columns * cardWidth + (columns - 1) * gap,
-            if (shortRow) cardHeight else -1, if (shortRow) Gravity.CENTER else Gravity.TOP or Gravity.CENTER_HORIZONTAL)
-        empty.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
-        apps.visibility = if (entries.isEmpty()) View.GONE else View.VISIBLE
-        if (keepExit || entries.isEmpty()) exit.requestFocus() else {
-            apps.requestFocus()
-            apps.setSelection(entries.indexOfFirst { it.packageName == selected }.coerceAtLeast(0))
-        }
-    }
-
-    private inner class Card : LinearLayout(activity) {
-        private var entry: AppEntry? = null
-        private val art = ImageView(activity).apply {
-            scaleType = ImageView.ScaleType.FIT_XY
-            background = familySurface(Style.theme.placeholder, Color.TRANSPARENT, 10)
-            clipToOutline = true
-        }
-        private val name = TextView(activity).apply {
-            gravity = Gravity.CENTER
-            typeface = Style.MEDIUM
-            sizeDp(16f)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Style.theme.text)
-        }
-
-        init {
-            layoutParams = AbsListView.LayoutParams(-1, cardHeight)
-            orientation = VERTICAL
-            // Leave a gutter for GridView's selection outline.
-            val surface = familySurface(Style.theme.placeholder, Color.TRANSPARENT, 12)
-            background = android.graphics.drawable.InsetDrawable(surface, 3.dp)
-            setPadding(6.dp, 6.dp, 6.dp, 4.dp)
-            addView(art, LayoutParams(-1, artHeight))
-            addView(name, LayoutParams(-1, 0, 1f))
-        }
-
-        fun bind(app: AppEntry) {
-            if (entry == app) return
-            entry = app
-            name.text = app.label
-            contentDescription = app.label
-            val w = artWidth.coerceAtMost(168.dp)
-            val hit = activity.tiles.get(app, w, w * 9 / 16) { bitmap ->
-                if (entry == app) art.setImageBitmap(bitmap)
+        val size = activity.prefs.iconSize
+        // Keep the same banner size when a fourth app arrives. The tray wraps the
+        // actual columns, leaving the remaining landscape visible beside short rows.
+        val gap = 18.dp
+        val glow = TileCell.GLOW_PAD.dp
+        val available = resources.displayMetrics.widthPixels - 2 * activity.safeH
+        val w = minOf(Style.favW(size), (available - 3 * gap - glow) / 4).coerceAtLeast(1)
+        val h = w * 9 / 16
+        grid.columns = if (next.size in 5..6) 3 else 4
+        val visibleColumns = if (useGrid) minOf(grid.columns, next.size) else next.size
+        val trayWidth = 2 * gap + glow + visibleColumns * w + (visibleColumns - 1).coerceAtLeast(0) * gap
+        val params = dock.layoutParams as LinearLayout.LayoutParams
+        params.width = minOf(trayWidth, available + 2 * gap)
+        dock.layoutParams = params
+        val cells = next.mapIndexed { index, app ->
+            activity.makeCell(app, w, h, false).apply {
+                tile.focusRingColor = GOLD
+                isLongClickable = false
+                setOnClickListener { activity.launch(app, tile) }
+                focusListener = { _, hasFocus ->
+                    if (hasFocus) {
+                        selected = index
+                        title.text = app.label
+                    }
+                }
             }
-            art.setImageBitmap(hit)
+        }
+        val target = next.indexOfFirst { it.packageName == previous }.coerceAtLeast(0)
+        if (useGrid) grid.setCells(cells) else row.setCells(cells)
+        selected = target
+        title.text = next.getOrNull(target)?.label ?: "No apps selected"
+        dock.visibility = if (next.isEmpty()) View.GONE else View.VISIBLE
+        val focusTarget = if (keepExit || next.isEmpty()) exit else cellAt(target)
+        if (focusTarget != null && !focusTarget.requestFocus() && hasWindowFocus()) {
+            focusTarget.requestFocusFromTouch()
         }
     }
 }

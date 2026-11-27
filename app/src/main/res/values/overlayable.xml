@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <overlayable name="GlowHomeConfig">
+        <policy type="system|product|vendor|odm|oem|signature">
+            <item type="bool" name="def_keep_tv_light" />
+        </policy>
+    </overlayable>
+</resources>

@@ -31,6 +31,8 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
         }
         val title = TextView(activity).apply {
             text = if (setting) "Choose a 4-digit PIN" else "Enter PIN"
+            accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+            gravity = Gravity.CENTER
             sizeDp(24f)
             typeface = Style.MEDIUM
             setTextColor(Style.theme.text)
@@ -42,7 +44,17 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
             letterSpacing = .24f
             setTextColor(Style.accent)
         }
-        pad.addView(mask, LinearLayout.LayoutParams(-1, 38.dp))
+        val normalField = familySurface(Style.theme.placeholder, Style.theme.panelStroke, 10)
+        val errorEdge = Color.rgb(233, 155, 145)
+        mask.background = normalField
+        pad.addView(mask, LinearLayout.LayoutParams(134.dp, 36.dp).apply { topMargin = 8.dp })
+        val feedback = TextView(activity).apply {
+            sizeDp(15f)
+            gravity = Gravity.CENTER
+            setTextColor(Color.rgb(248, 186, 176))
+            accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        pad.addView(feedback, LinearLayout.LayoutParams(-1, 30.dp))
         var digits = ""
         var first: String? = null
         var busy = false
@@ -50,9 +62,23 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
             mask.text = "●".repeat(digits.length) + "○".repeat(4 - digits.length)
             mask.contentDescription = "${digits.length} of 4 digits entered"
         }
+        var retry = false
+        fun showError(message: String) {
+            retry = true
+            mask.background = familySurface(Style.theme.placeholder, errorEdge, 10)
+            title.text = if (setting) "Choose a 4-digit PIN" else "Enter PIN"
+            feedback.text = message
+            display()
+        }
         fun input(key: String) {
             if (key == "Cancel") { prompt.dismiss(); return }
             if (busy) return
+            if (retry) {
+                if (key == "Delete") return
+                retry = false
+                mask.background = normalField
+                feedback.text = ""
+            }
             digits = if (key == "Delete") digits.dropLast(1) else digits + key
             display()
             if (digits.length != 4) return
@@ -60,7 +86,7 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
             digits = ""
             when {
                 setting && first == null -> { first = entry; title.text = "Confirm PIN"; display() }
-                setting && first != entry -> { first = null; title.text = "Choose a 4-digit PIN"; display() }
+                setting && first != entry -> { first = null; showError("PINs differ. Try again.") }
                 else -> {
                     busy = true
                     title.text = if (setting) "Saving PIN…" else "Checking PIN…"
@@ -78,12 +104,7 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
                                 done()
                             } else {
                                 if (setting) first = null
-                                title.text = when {
-                                    checked == null -> "PIN unavailable. Try again."
-                                    setting -> "Choose a 4-digit PIN"
-                                    else -> "Enter PIN"
-                                }
-                                display()
+                                showError(if (checked == null) "PIN unavailable. Try again." else "Wrong PIN. Try again.")
                             }
                         }
                     }

@@ -58,7 +58,9 @@ class AppRepository(private val ctx: Context, private val prefs: Prefs) {
         apps = try {
             val allowed = allowedPackages
             if (cacheFile.exists()) cacheFile.useLines { lines ->
-                lines.mapNotNull { AppEntry.parse(it) }.filter { allowed == null || it.packageName in allowed }.toList()
+                lines.mapNotNull { AppEntry.parse(it) }
+                    .filter { it.packageName !in AppOrdering.NEVER_SHOW && (allowed == null || it.packageName in allowed) }
+                    .toList()
             } else emptyList()
         } catch (e: Exception) {
             emptyList()
@@ -139,7 +141,7 @@ class AppRepository(private val ctx: Context, private val prefs: Prefs) {
             byPkg[pkg] = AppEntry(
                 packageName = pkg,
                 className = ai.name,
-                label = ri.loadLabel(pm)?.toString()?.trim().orEmpty().ifEmpty { pkg },
+                label = AppEntry.displayLabel(pkg, ri.loadLabel(pm)?.toString()?.trim().orEmpty().ifEmpty { pkg }),
                 leanback = isLean,
                 system = system,
                 installedAt = pi?.firstInstallTime ?: 0L,

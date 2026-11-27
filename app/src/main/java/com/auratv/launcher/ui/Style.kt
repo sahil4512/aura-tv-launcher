@@ -11,6 +11,12 @@ import com.auratv.launcher.util.dp
 
 /** Current visual parameters, derived from preferences. Read by every view. */
 object Style {
+    fun dockBackground(backdrop: Boolean) = android.graphics.drawable.GradientDrawable().apply {
+        setColor(android.graphics.Color.argb(if (backdrop) 30 else 46, 255, 255, 255))
+        cornerRadius = 22f.dp
+        setStroke(1.dp, android.graphics.Color.argb(if (backdrop) 40 else 56, 255, 255, 255))
+    }
+
     var theme: AuraTheme = AuraTheme.MIDNIGHT
     var animFactor = 1f
     /** Accent: the theme's own, or the user's pick from the Appearance swatches. */

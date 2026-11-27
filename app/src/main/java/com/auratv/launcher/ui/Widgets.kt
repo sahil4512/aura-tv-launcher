@@ -160,7 +160,7 @@ class ChipButton(context: Context, private val icon: Int, text: String) : View(c
         textSize = 13f * com.auratv.launcher.util.Dp.density
         typeface = Style.MEDIUM
     }
-    private val glyph = Path()
+    private val settingsGlyph = if (icon == ICON_GEAR) context.getDrawable(com.auratv.launcher.R.drawable.ic_system)?.mutate() else null
     var text: String = text
         set(v) { if (field != v) { field = v; contentDescription = v; requestLayout(); invalidate() } }
 
@@ -245,25 +245,18 @@ class ChipButton(context: Context, private val icon: Int, text: String) : View(c
                     c.drawLine(x + s * 0.1f, y + s * 0.1f, x + s * 0.9f, y + s * 0.9f, p)
                 }
             }
+            ICON_EXIT -> {
+                p.style = Paint.Style.STROKE
+                c.drawLine(x, y + s * 0.5f, x + s, y + s * 0.5f, p)
+                c.drawLine(x + s * 0.55f, y + s * 0.1f, x + s, y + s * 0.5f, p)
+                c.drawLine(x + s * 0.55f, y + s * 0.9f, x + s, y + s * 0.5f, p)
+            }
             ICON_GEAR -> {
-                glyph.reset()
-                val cx = x + s / 2; val cy = y + s / 2
-                val ro = s * 0.5f; val ri = s * 0.36f
-                val teeth = 8
-                for (i in 0 until teeth * 2) {
-                    val a0 = Math.PI * 2 * i / (teeth * 2) - Math.PI / (teeth * 2)
-                    val a1 = a0 + Math.PI * 2 / (teeth * 2)
-                    val rr = if (i % 2 == 0) ro else ri
-                    val x0 = cx + rr * cos(a0).toFloat(); val y0 = cy + rr * sin(a0).toFloat()
-                    val x1 = cx + rr * cos(a1).toFloat(); val y1 = cy + rr * sin(a1).toFloat()
-                    if (i == 0) glyph.moveTo(x0, y0) else glyph.lineTo(x0, y0)
-                    glyph.lineTo(x1, y1)
+                settingsGlyph?.apply {
+                    setBounds(x.toInt(), y.toInt(), (x + s).toInt(), (y + s).toInt())
+                    setTint(ink)
+                    draw(c)
                 }
-                glyph.close()
-                glyph.addCircle(cx, cy, s * 0.15f, Path.Direction.CW)
-                glyph.fillType = Path.FillType.EVEN_ODD
-                p.style = Paint.Style.FILL
-                c.drawPath(glyph, p)
             }
         }
     }
@@ -273,5 +266,6 @@ class ChipButton(context: Context, private val icon: Int, text: String) : View(c
         const val ICON_WIFI = 1
         const val ICON_WIFI_OFF = 2
         const val ICON_GEAR = 3
+        const val ICON_EXIT = 4
     }
 }

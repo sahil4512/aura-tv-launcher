@@ -47,7 +47,9 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
     class Toggle(val title: String, val sub: String? = null, val get: () -> Boolean, val set: (Boolean) -> Unit) : Item()
     class Choice(val title: String, val options: List<String>, val get: () -> Int, val set: (Int) -> Unit, val sub: String? = null) : Item()
     class Nav(val title: String, val sub: () -> String? = { null }, val open: () -> Unit) : Item()
-    class Action(val title: String, val sub: String? = null, val value: String? = null, val run: () -> Unit) : Item()
+    class Action(val title: String, val sub: String? = null, val value: String? = null, val icon: Int? = null, val run: () -> Unit) : Item()
+    class RemoteChoices(val direct: () -> Unit, val branded: () -> Unit) : Item()
+    class Guide(val title: String, val instruction: String) : Item()
     class Info(val title: String, val value: String) : Item()
     class Pick(val title: String, val sub: String?, val selected: Boolean,
                val thumb: (((Bitmap?) -> Unit) -> Unit)?, val run: () -> Unit) : Item()
@@ -71,7 +73,7 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         SectionDef("Layout", R.drawable.ic_layout) { layoutPage() },
         SectionDef("System", R.drawable.ic_system) { systemPage() },
         SectionDef("Kids Mode", R.drawable.ic_apps) { kidsPage() },
-        SectionDef("Button Remapping", R.drawable.ic_layout) { remapPage() },
+        SectionDef("Remote Buttons", R.drawable.ic_remote) { remotePage() },
         SectionDef("About", R.drawable.ic_about) { aboutPage() },
     )
     private var section = 0
@@ -152,7 +154,10 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         sections.forEachIndexed { i, s ->
             val item = SideItem(ctx, s.icon, s.title)
             item.setOnFocusChangeListener { _, has -> if (has && i != section && !rendering) showSection(i) else item.refresh(i == section) }
-            item.setOnClickListener { focusContent() }
+            item.setOnClickListener {
+                if (section != i) showSection(i)
+                focusContent()
+            }
             item.setOnKeyListener { _, code, e ->
                 if (e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_RIGHT) { focusContent(); true } else false
             }
@@ -249,7 +254,11 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
     private fun render(focusFirst: Boolean) {
         val page = stack.last()
         pageToken++
-        crumb.text = if (stack.size > 1) stack.dropLast(1).joinToString("  ›  ") { it.title }.uppercase() else ""
+        crumb.text = when {
+            stack.size <= 1 -> ""
+            sections[section].title == "Remote Buttons" -> stack.first().title.uppercase()
+            else -> stack.dropLast(1).joinToString("  ›  ") { it.title }.uppercase()
+        }
         crumb.visibility = if (stack.size > 1) View.VISIBLE else View.GONE
         heading.text = page.title
         rendering = true
@@ -296,6 +305,27 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
 
     private fun lp(top: Int = 0) = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         .apply { topMargin = top; bottomMargin = 2.dp }
+
+    private fun remoteCard(icon: Int, label: String, hint: String, fill: Int, open: () -> Unit) =
+        LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            isFocusable = true
+            setPadding(16.dp, 15.dp, 16.dp, 15.dp)
+            fun outline(focused: Boolean) = familySurface(fill, if (focused) Style.accent else Style.theme.panelStroke, 14)
+            background = outline(false)
+            setOnFocusChangeListener { _, focused -> background = outline(focused) }
+            setOnClickListener { open() }
+            addView(ImageView(ctx).apply { setImageResource(icon); setColorFilter(Style.theme.text) },
+                LinearLayout.LayoutParams(25.dp, 25.dp))
+            addView(TextView(ctx).apply {
+                text = label
+                sizeDp(18f)
+                typeface = Style.MEDIUM
+                setTextColor(Style.theme.text)
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
+            addView(TextView(ctx).apply { text = hint; sizeDp(14f); setTextColor(Style.theme.textDim) },
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4.dp })
+        }
 
     private fun makeView(item: Item): View = when (item) {
         is Section -> TextView(ctx).apply {
@@ -347,7 +377,46 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
             title.text = item.title
             setSubtitle(item.sub)
             value.text = item.value ?: ""
+            item.icon?.let { icon ->
+                setThumb(null, 28, 28)
+                thumb.setBackgroundColor(Color.TRANSPARENT)
+                thumb.setImageResource(icon)
+                thumb.setColorFilter(Style.theme.text)
+            }
             setOnClickListener { item.run() }
+        }
+        is RemoteChoices -> LinearLayout(ctx).apply {
+            layoutParams = lp(12.dp)
+            val direct = remoteCard(R.drawable.ic_remote, "Change a button on GlowHome",
+                "Open an app with a button while you’re on Home.", 0xff26364b.toInt(), item.direct)
+            val branded = remoteCard(R.drawable.ic_app_redirect, "Redirect an app button",
+                "For buttons like Netflix that open an app immediately.", 0xff303249.toInt(), item.branded)
+            addView(direct, LinearLayout.LayoutParams(0, -1, 1f))
+            addView(branded, LinearLayout.LayoutParams(0, -1, 1f).apply { leftMargin = 12.dp })
+        }
+        is Guide -> LinearLayout(ctx).apply {
+            layoutParams = lp().apply { bottomMargin = 8.dp }
+            background = Style.panelBackground(14f)
+            setPadding(16.dp, 12.dp, 16.dp, 12.dp)
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ImageView(ctx).apply {
+                setImageResource(R.drawable.ic_remote)
+                setColorFilter(Style.accent)
+            }, LinearLayout.LayoutParams(32.dp, 40.dp).apply { rightMargin = 16.dp })
+            addView(LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(ctx).apply {
+                    text = item.title
+                    typeface = Style.MEDIUM
+                    sizeDp(18f)
+                    setTextColor(Style.theme.text)
+                })
+                addView(TextView(ctx).apply {
+                    text = item.instruction
+                    sizeDp(15f)
+                    setTextColor(Style.theme.textDim)
+                })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
         }
         is Info -> MenuRow(ctx).apply {
             layoutParams = lp()
@@ -641,6 +710,8 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
                     }
                 })
             },
+            Choice("Scenery", listOf("Automatic", "Day", "Night"), { p.kidsScenery },
+                { p.kidsScenery = it }, "Automatic uses daylight from 6 AM to 6 PM on this TV."),
             Action("Set or change PIN", "If you forget your PIN, reinstall GlowHome to clear its local data.") {
                 val choose = { activity.pin.set { reload() } }
                 if (family.hasPin) activity.pin.verify(choose) else choose()
@@ -652,38 +723,17 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         )
     }
 
-    private fun remapPage() = Page("Button Remapping") {
-        val mappings = com.auratv.launcher.redirect.AppRemaps.decode(p.buttonMappings)
-        val apps = AppOrdering.sortForAllApps(activity.repo.apps, 0)
-        val labels = apps.associate { it.packageName to it.label }
-        val sources = apps.sortedBy { AppOrdering.priority(it.packageName).coerceAtMost(2) }
-        buildList {
-            add(Info("When a source app opens, its replacement opens next. The source may flash briefly.", ""))
-            add(Info("Usage access · same grant as Home redirect", if (HomeRedirect.hasUsageAccess(ctx)) "Granted" else "Required"))
-            if (!HomeRedirect.hasUsageAccess(ctx)) add(Info(HomeRedirect.usageAccessCommand(ctx), ""))
-            add(Info("Some newer TVs block the replacement when the stock launcher is Home.", ""))
-            for (source in sources) add(Nav(source.label, {
-                mappings[source.packageName]?.let { labels[it] ?: "App unavailable" } ?: "None"
-            }) {
-                push(Page(source.label) {
-                    val current = mappings[source.packageName]
-                    fun select(pkg: String?) {
-                        val updated = com.auratv.launcher.redirect.AppRemaps.decode(p.buttonMappings).toMutableMap()
-                        if (pkg == null) updated.remove(source.packageName) else updated[source.packageName] = pkg
-                        p.buttonMappings = updated.map { (src, dst) -> "$src=$dst" }
-                        applyRedirect()
-                        pop()
-                    }
-                    buildList {
-                        add(Pick("None", null, current == null, null) { select(null) })
-                        for (app in apps) if (app.packageName != source.packageName) {
-                            add(Pick(app.label, null, current == app.packageName, null) { select(app.packageName) })
-                        }
-                    }
-                })
-            })
-        }
+    fun resumeRemoteSetup() {
+        showSection(sections.indexOfFirst { it.title == "Remote Buttons" })
+        remoteButtons.resumeSetup()
     }
+
+    private fun remotePage(): Page = remoteButtons.page()
+
+    internal val remoteButtons = RemoteButtons(activity, ::push, { stack.lastOrNull() }, {
+        showSection(sections.indexOfFirst { it.title == "Remote Buttons" })
+        focusContent()
+    }, ::reload)
 
     private fun layoutPage() = Page("Layout") {
         val items = ArrayList<Item>()
@@ -702,24 +752,43 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
     private fun systemPage() = Page("System") {
         val items = ArrayList<Item>()
         val fire = HomeRedirect.isFireOs(ctx)
-        items += Action(if (fire) "Fire TV Settings" else "TV Settings", "Network, picture, sound, apps…") { activity.openSystemSettings() }
+        items += Action(if (fire) "Fire TV Settings" else "TV Settings", "Network, picture, sound, apps…", icon = R.drawable.ic_system) { activity.openSystemSettings() }
         if (fire) items += Nav("Home Button", { homeButtonSummary() }) { push(homeButtonPage()) }
         else items += Action("Make GlowHome Your Home Screen",
             if (DefaultHome.isAuraHome(ctx)) "Done: the Home button opens GlowHome" else "So the Home button opens GlowHome") { activity.offerDefaultHome() }
-        items += Toggle("Keep the TV Light", "When you open an app, close other apps running in the background",
+        items += Toggle("Keep the TV Light", "Release GlowHome’s cached artwork when you leave Home.",
             { p.keepTvLight }, { p.keepTvLight = it })
         items += Section("Backup")
-        items += Action("Back Up Settings", "Saves to ${activity.backupFile().path}") { activity.backupSettings() }
-        items += Action("Restore From Backup", "Reads ${activity.backupFile().name}") {
-            activity.openOverlay(ConfirmOverlay(activity, "Restore settings?", "Your current settings will be replaced with the backup.",
-                listOf("Restore" to { activity.restoreSettings() }, "Cancel" to {})))
-        }
+        items += Action("Back Up Settings", "Choose where to save your settings") { push(backupPage(true)) }
+        items += Action("Restore From Backup", "Choose a saved settings file") { push(backupPage(false)) }
         items += Action("Reset GlowHome TV", "Theme, wallpaper, favourites — everything") {
             activity.openOverlay(ConfirmOverlay(activity, "Reset GlowHome TV?",
                 "All settings, favourites and hidden apps go back to defaults. Imported images are kept.",
                 listOf("Reset everything" to { activity.resetAll() }, "Cancel" to {})))
         }
         items
+    }
+
+    private fun backupPage(export: Boolean) = Page(if (export) "Back Up Settings" else "Restore From Backup") {
+        buildList {
+            val picker = activity.backupDocumentIntent(export)
+            if (picker != null) add(Action("Choose a file location", "USB or network shares available in your file picker") {
+                activity.pickBackupDocument(picker, export)
+            })
+            val drives = com.auratv.launcher.settings.BackupFiles.usbFiles(ctx, export)
+            if (picker == null && drives.isEmpty())
+                add(Info("Connect a USB drive, then reopen this page to choose it.", ""))
+            for (file in drives) {
+                val volume = file.path.substringBefore("/Android/")
+                add(Action("USB drive · $volume", if (export) "Disconnect the drive before a factory reset." else file.name) {
+                    if (export && file.exists()) activity.openOverlay(ConfirmOverlay(activity, "Replace USB backup?",
+                        file.path, listOf("Replace" to { activity.transferBackup(file, true) }, "Cancel" to {})))
+                    else activity.transferBackup(file, export)
+                })
+            }
+            add(Action("This TV", activity.backupFile().path) { activity.transferBackup(activity.backupFile(), export) })
+            if (export) add(Info("For a factory reset, keep a copy on a removable drive or a network share.", ""))
+        }
     }
 
     private fun homeButtonSummary(): String = when {
@@ -750,6 +819,8 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
                 applyRedirect()
             }
         }
+        items += Toggle("Open GlowHome After Restart", "Open once when Fire TV finishes starting up",
+            { p.openAfterRestart }, { p.openAfterRestart = it; applyRedirect() })
         val access = HomeRedirect.hasUsageAccess(ctx)
         items += Info("Usage access", if (access) "Granted ✓" else "Not granted")
         if (!access) items += Info("Grant it once from a computer:\n${HomeRedirect.usageAccessCommand(ctx)}", "")

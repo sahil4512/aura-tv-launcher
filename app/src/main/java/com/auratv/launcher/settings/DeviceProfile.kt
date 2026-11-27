@@ -37,7 +37,6 @@ object DeviceProfile {
         if (info.lowEnd) {
             p.wallpaperType = Prefs.TYPE_SOLID // nothing to decode or redraw
             p.uiAnimSpeed = 2                  // Quick
-            p.keepTvLight = true
         }
         p.sp.edit().putBoolean(key, true).putString("profile_label", info.label).apply()
         Log.i("Aura", "device profile: ${info.label}")

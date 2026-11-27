@@ -16,7 +16,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ui_check import Dev, Run, set_pref, PKG  # noqa: E402
+from ui_check import Dev, Run, open_settings, set_pref, PKG  # noqa: E402
 
 TEST_HOME = "com.android.launcher3"
 HOME_ACT = TEST_HOME + "/.Launcher"
@@ -151,6 +151,9 @@ def scenario_checks(d, R):
         time.sleep(0.25)
         if redirect_count(d)[1]:
             break
+    # Model a viewer reacting after the new Home is visible. An immediate repeat
+    # during Android’s app-switch hold is a different case, exercised by H3b.
+    time.sleep(0.65)
     d.sh("input keyevent HOME")
     time.sleep(10)
     stay = resumed(d)
@@ -163,8 +166,7 @@ def scenario_checks(d, R):
     # Settings -> Home Button -> Open Amazon Home: allowed once, then the window expires.
     d.start(4)
     d.key("BACK")
-    d.key("DPAD_UP", wait=0.5)
-    d.key("DPAD_CENTER", wait=1.5)
+    open_settings(d)
     ok = walk_to(d, "System")
     d.key("DPAD_RIGHT", wait=0.8)
     ok = ok and walk_to(d, "Home Button")

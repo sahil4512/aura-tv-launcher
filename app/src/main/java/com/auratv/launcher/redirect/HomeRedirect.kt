@@ -78,7 +78,7 @@ object HomeRedirect {
         val cfg = Config.from(ctx, p)
         val svc = Intent(ctx, HomeRedirectService::class.java)
         val run = cfg.watching
-        setBootReceiverEnabled(ctx, run)
+        setBootReceiverEnabled(ctx, run || (p.openAfterRestart && isFireOs(ctx)))
         if (run) {
             val i = cfg.toIntent(svc.setAction(ACTION_APPLY))
             try {
@@ -90,10 +90,7 @@ object HomeRedirect {
         }
     }
 
-    /**
-     * BootReceiver runs in ":redirect", so while the redirect is off it is disabled: boot and app
-     * updates then don't spawn that process just to read one preference. The state persists.
-     */
+    /** Keep the receiver disabled when no feature needs the redirect process at startup. */
     private fun setBootReceiverEnabled(ctx: Context, enabled: Boolean) {
         val pm = ctx.packageManager
         val cn = ComponentName(ctx, BootReceiver::class.java)

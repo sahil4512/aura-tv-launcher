@@ -115,7 +115,7 @@ class HomeGrid(context: Context) : FrameLayout(context) {
         // The rows are as tall as they need to be (taller than the grid when there are many apps):
         // measure them unbounded, then scroll within our own height.
         inner.measure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), resolveSize(inner.measuredHeight, heightMeasureSpec))
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {

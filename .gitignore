@@ -14,7 +14,7 @@ output-metadata.json
 !dist/*.sha256
 
 # --- Signing credentials (never commit) ---
-keystore/
+/keystore
 *.jks
 *.keystore
 signing.properties

@@ -21,6 +21,14 @@ class AppOrderingTest {
     private val zebra = app("com.zebra", label = "Zebra")
     private val all = listOf(zebra, files, hijack, downloader, prime, youtube, netflix)
 
+    @Test fun tclInputTileUsesFriendlyNameOnUpgradeWithoutChangingItsLaunchTarget() {
+        val source = app("com.tcl.sourcemananger", "com.tcl.sourcemanager.MainActivity", "SourceManager")
+        val cached = AppEntry.parse(source.serialize())
+        assertEquals(source.copy(label = "TV Inputs"), cached)
+        assertEquals("TV Inputs", AppEntry.displayLabel(source.packageName, source.label))
+        assertEquals("SourceManager", AppEntry.displayLabel("other.package", source.label))
+    }
+
     @Test fun seedPutsStreamingFirstAndSkipsUtilities() {
         val seed = AppOrdering.seedFavorites(all)
         assertEquals(listOf(netflix.key, youtube.key, prime.key, downloader.key, zebra.key), seed)
@@ -83,6 +91,13 @@ class AppOrderingTest {
     @Test fun amazonHomeIsNeverShown() {
         assertTrue("com.amazon.tv.launcher" in AppOrdering.NEVER_SHOW)
         assertTrue("com.auratv.launcher" in AppOrdering.NEVER_SHOW)
+    }
+
+    @Test fun excludesTclMaintenanceScreensAndKeepsTvInputs() {
+        val excluded = AppOrdering.NEVER_SHOW
+        for (pkg in listOf("com.tcl.rc.ota", "com.tcl.tcl_bt_rcu_service", "com.tcl.framework.custom",
+            "com.tcl.initsetup", "com.tcl.useragreement")) assertTrue(pkg in excluded)
+        for (pkg in listOf("com.tcl.tv", "com.tcl.sourcemananger", "com.tcl.settings")) assertTrue(pkg !in excluded)
     }
 
     @Test fun entrySerializationRoundTrips() {

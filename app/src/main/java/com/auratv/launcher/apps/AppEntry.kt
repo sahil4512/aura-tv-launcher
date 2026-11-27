@@ -20,11 +20,15 @@ data class AppEntry(
             installedAt.toString(), updatedAt.toString()).joinToString("\t")
 
     companion object {
+        // This TCL firmware spells the package name "sourcemananger".
+        fun displayLabel(pkg: String, label: String): String =
+            if (pkg == "com.tcl.sourcemananger") "TV Inputs" else label
+
         fun parse(line: String): AppEntry? {
             val p = line.split('\t')
             if (p.size < 7) return null
             return try {
-                AppEntry(p[0], p[1], p[2], p[3] == "1", p[4] == "1", p[5].toLong(), p[6].toLong())
+                AppEntry(p[0], p[1], displayLabel(p[0], p[2]), p[3] == "1", p[4] == "1", p[5].toLong(), p[6].toLong())
             } catch (e: NumberFormatException) {
                 null
             }

@@ -7,8 +7,12 @@ import java.util.Locale
  */
 object AppOrdering {
 
-    /** Packages never shown at all: ourselves, and Amazon Home (opening it would just bounce back here). */
-    val NEVER_SHOW = setOf("com.auratv.launcher", "com.amazon.tv.launcher")
+    /** Launchers and vendor maintenance screens that have no place in the app catalog. */
+    val NEVER_SHOW = setOf(
+        "com.auratv.launcher", "com.amazon.tv.launcher",
+        "com.tcl.rc.ota", "com.tcl.tcl_bt_rcu_service", "com.tcl.framework.custom",
+        "com.tcl.initsetup", "com.tcl.useragreement",
+    )
 
     /** Utility packages that are fine in All Apps but shouldn't be seeded into favourites. */
     private val NOT_FAVOURITE_BY_DEFAULT = setOf(

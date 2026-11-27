@@ -20,6 +20,7 @@ import android.text.TextUtils
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.LruCache
+import com.auratv.launcher.R
 import com.auratv.launcher.util.Bg
 import java.io.File
 import java.io.FileOutputStream
@@ -117,6 +118,22 @@ class TileCache(private val ctx: Context) {
         }
         val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
+        val systemIcon = when (e.packageName) {
+            "com.tcl.sourcemananger" -> R.drawable.ic_tv_inputs
+            "com.android.tv.settings", "com.tcl.settings", "com.android.settings",
+            "com.amazon.tv.settings", "com.amazon.tv.settings.v2" -> R.drawable.ic_system
+            else -> if (e.system && e.label.equals("TV Settings", true)) R.drawable.ic_system else null
+        }
+        if (systemIcon != null) {
+            val inputs = systemIcon == R.drawable.ic_tv_inputs
+            c.drawColor(if (inputs) 0xff205961.toInt() else 0xff435a75.toInt())
+            val size = (h * .55f).toInt()
+            ctx.getDrawable(systemIcon)!!.apply {
+                setBounds((w - size) / 2, (h - size) / 2, (w + size) / 2, (h + size) / 2)
+                draw(c)
+            }
+            return out
+        }
         val banner: Drawable? = try { ai.loadBanner(pm) } catch (_: Exception) { null }
         if (banner != null && banner.intrinsicWidth > 0 && banner.intrinsicHeight > 0) {
             drawBanner(c, banner, w, h)
@@ -271,6 +288,6 @@ class TileCache(private val ctx: Context) {
         /** Hard cap for the disk cache (about 3–4x a typical TV's tiles at two sizes). */
         private const val DISK_BYTES = 24L * 1024 * 1024
         /** Bump when the tile artwork style changes so disk caches re-render. */
-        private const val STYLE = 4 // v4: brightness-balanced cards (TileTone)
+        private const val STYLE = 6 // Includes built-in TV Settings and TV Inputs artwork.
     }
 }
