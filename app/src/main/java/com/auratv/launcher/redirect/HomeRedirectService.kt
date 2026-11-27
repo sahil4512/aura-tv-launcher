@@ -41,6 +41,7 @@ class HomeRedirectService : Service() {
     private val watchStartedAt = System.currentTimeMillis()
     private var started = false
     private var foreground = false
+    private var notifiedText: String? = null
     private val usageAccess = UsageAccessCache()
 
     private val pollRunnable = Runnable { poll() }
@@ -101,7 +102,7 @@ class HomeRedirectService : Service() {
             homePackage = cfg.homePackage
             homeClassHint = if (cfg.homePackage == RedirectPolicy.AMAZON_LAUNCHER) "HomeActivity" else ""
         }
-        updateForeground(cfg.resident)
+        updateForeground(cfg)
         RedirectRuntime.serviceActive = true
         RedirectRuntime.pollNow = {
             handler.removeCallbacks(pollRunnable)
@@ -183,17 +184,27 @@ class HomeRedirectService : Service() {
         }
     }
 
-    private fun updateForeground(resident: Boolean) {
-        if (resident && !foreground) {
-            startForeground(NOTIFICATION_ID, buildNotification())
+    private fun updateForeground(cfg: HomeRedirect.Config) {
+        val text = notificationText(cfg)
+        if (cfg.resident && (!foreground || text != notifiedText)) {
+            // Calling startForeground again with the same id updates the shown text.
+            startForeground(NOTIFICATION_ID, buildNotification(text))
             foreground = true
-        } else if (!resident && foreground) {
+            notifiedText = text
+        } else if (!cfg.resident && foreground) {
             stopForeground(true)
             foreground = false
+            notifiedText = null
         }
     }
 
-    private fun buildNotification(): Notification {
+    private fun notificationText(cfg: HomeRedirect.Config) = when {
+        cfg.enabled && cfg.mappings.isNotEmpty() -> "Home button and app redirects"
+        cfg.enabled -> "Home button opens GlowHome"
+        else -> "App redirects are on"
+    }
+
+    private fun buildNotification(text: String): Notification {
         val b = if (Build.VERSION.SDK_INT >= 26) {
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(NotificationChannel(CHANNEL, "Home button", NotificationManager.IMPORTANCE_MIN))
@@ -204,7 +215,7 @@ class HomeRedirectService : Service() {
         }
         return b.setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("GlowHome TV")
-            .setContentText("Watching remote button shortcuts")
+            .setContentText(text)
             .setOngoing(true)
             .setShowWhen(false)
             .build()
@@ -216,7 +227,7 @@ class HomeRedirectService : Service() {
         RedirectRuntime.serviceActive = false
         RedirectRuntime.pollNow = null
         RedirectRuntime.config = HomeRedirect.Config()
-        if (foreground) { stopForeground(true); foreground = false }
+        if (foreground) { stopForeground(true); foreground = false; notifiedText = null }
         started = false
     }
 

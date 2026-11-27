@@ -75,6 +75,7 @@ class MainActivity : Activity() {
     private lateinit var chipApps: ChipButton
     private lateinit var chipWifi: ChipButton
     private lateinit var chipSettings: ChipButton
+    private lateinit var chipKids: ChipButton
     private lateinit var heroTitle: TextView
     private lateinit var hint: TextView
     private lateinit var dock: FrameLayout
@@ -91,6 +92,7 @@ class MainActivity : Activity() {
     private var recentsToken = 0
 
     private var consumedShortcut = KeyEvent.KEYCODE_UNKNOWN
+    private var setupLeftAt = 0L
     private val remoteSetup get() = (overlays.lastOrNull() as? SettingsPanel)?.remoteButtons
     private val overlays = ArrayList<Overlay>()
     private var lastHomeFocus: View? = null
@@ -267,6 +269,12 @@ class MainActivity : Activity() {
         super.onStart()
         Bg.main.removeCallbacks(keepLight) // back on Home within a few seconds: leave everything as it was
         if (kidsHome != null) return
+        clockTicker.start()
+        // A locked panel kept open for button setup closes if nobody returns within the setup window.
+        val awayFor = SystemClock.elapsedRealtime() - setupLeftAt
+        if (setupLeftAt != 0L && family.lockSettings && awayFor !in 0L..SETUP_RETURN_MS)
+            while (overlays.isNotEmpty()) closeOverlay(overlays.last(), animate = false)
+        setupLeftAt = 0L
         remoteSetup?.returned()
         wallpaper.onStart()
         noteUserActivity() // motion runs again for a while whenever Home comes back
@@ -288,9 +296,13 @@ class MainActivity : Activity() {
         super.onStop()
         if (prefs.keepTvLight) Bg.main.postDelayed(keepLight, 4_000)
         pin.dismiss()
+        clockTicker.stop()
         if (kidsHome != null) return
+        // Button setup sends you to another app and back; keep its page so the step isn't lost.
+        val awaitingSetup = remoteSetup?.expectingReturn() == true
         remoteSetup?.leaving()
-        if (family.lockSettings) while (overlays.isNotEmpty()) closeOverlay(overlays.last(), animate = false)
+        if (awaitingSetup) setupLeftAt = SystemClock.elapsedRealtime()
+        else if (family.lockSettings) while (overlays.isNotEmpty()) closeOverlay(overlays.last(), animate = false)
         wallpaper.onStop()
         Bg.main.removeCallbacks(idleMotionPause)
         try { unregisterReceiver(netReceiver) } catch (_: Exception) {}
@@ -401,7 +413,8 @@ class MainActivity : Activity() {
     /**
      * Focus when Home appears: the card of the app you were last using, else the first card. When an
      * app closes on its own (an update, TCL's memory manager), the next OK press then reopens that
-     * app instead of whatever happens to be the first card.
+     * app instead of whatever happens to be the first card. Standby and a fresh boot clear it
+     * (AuraApp), so a TV that was switched off starts on the first card.
      */
     fun focusHome() {
         val key = prefs.lastLaunchedKey
@@ -517,7 +530,23 @@ class MainActivity : Activity() {
             isLongClickable = true
             setOnLongClickListener { openSettings(); true }
         }
-        val chips = listOf(chipApps, chipWifi, chipSettings)
+        // Kids Mode: one press starts it once kids apps are chosen (leaving it needs the PIN);
+        // before that it opens the Kids Mode settings page.
+        chipKids = ChipButton(this, ChipButton.ICON_KIDS, "Kids Mode").apply {
+            setOnClickListener { openKidsChip() }
+            setOnFocusChangeListener { _, has ->
+                if (moveKey != null) return@setOnFocusChangeListener
+                hint.text = if (kidsReady()) "Select: start kids mode   ·   Leaving it needs your PIN"
+                    else "Select: choose the apps kids can see"
+                hint.visibility = if (has) View.VISIBLE else View.GONE
+            }
+        }
+        val chips = listOf(chipApps, chipWifi, chipKids, chipSettings)
+        fun neighbour(i: Int, step: Int): View? {
+            var j = i + step
+            while (j in chips.indices && chips[j].visibility != View.VISIBLE) j += step
+            return chips.getOrNull(j)
+        }
         val chipBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -534,8 +563,8 @@ class MainActivity : Activity() {
                     when (code) {
                         KeyEvent.KEYCODE_DPAD_DOWN -> { focusFavorites(keepIndex = true); true }
                         KeyEvent.KEYCODE_DPAD_UP -> true
-                        KeyEvent.KEYCODE_DPAD_LEFT -> { chips.getOrNull(i - 1)?.requestFocus(); true }
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> { chips.getOrNull(i + 1)?.requestFocus(); true }
+                        KeyEvent.KEYCODE_DPAD_LEFT -> { neighbour(i, -1)?.requestFocus(); true }
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> { neighbour(i, 1)?.requestFocus(); true }
                         else -> false
                     }
                 }
@@ -679,6 +708,12 @@ class MainActivity : Activity() {
     /** "Good Evening" etc. Re-evaluated whenever Home becomes visible and on each hour boundary. */
     private val greetingTick = Runnable { updateGreeting() }
 
+    /** Our own minute tick for the TextClocks (some TVs stop sending ACTION_TIME_TICK). */
+    private val clockTicker = MinuteTicker {
+        // Re-setting a TextClock's format makes it re-read the time.
+        for (c in listOf(clock, ampm, date)) c.format12Hour = c.format12Hour
+    }
+
     private fun updateGreeting() {
         val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         greeting.text = when (h) {
@@ -720,7 +755,8 @@ class MainActivity : Activity() {
         greeting.visibility = if (prefs.showGreeting) View.VISIBLE else View.GONE
         heroTitle.setTextColor(t.text)
         hint.setTextColor(Style.withAlpha(t.text, 205))
-        listOf(chipApps, chipWifi, chipSettings).forEach { it.invalidate() }
+        chipKids.visibility = if (prefs.showKidsChip) View.VISIBLE else View.GONE
+        listOf(chipApps, chipWifi, chipKids, chipSettings).forEach { it.invalidate() }
         dock.background = Style.dockBackground(backdrop)
         appsHeader.setTextColor(Style.withAlpha(t.text, 205))
         recentsHeader.setTextColor(Style.withAlpha(t.text, 205))
@@ -905,7 +941,7 @@ class MainActivity : Activity() {
     }
 
     /** ▲ from the top row: the chip closest to the card above which focus was. */
-    private fun nearestChip(x: Float): View = listOf(chipApps, chipWifi, chipSettings).minByOrNull {
+    private fun nearestChip(x: Float): View = listOf(chipApps, chipWifi, chipKids, chipSettings).filter { it.visibility == View.VISIBLE }.minByOrNull {
         val loc = IntArray(2); it.getLocationInWindow(loc)
         kotlin.math.abs(loc[0] + it.width / 2f - x)
     } ?: chipSettings
@@ -1140,6 +1176,10 @@ class MainActivity : Activity() {
             HomeRedirect.apply(this, prefs)
             recreate()
         }
+        if (repo.apps.none { it.packageName in family.allowed }) {
+            toast("Choose apps kids can see first")
+            return
+        }
         if (family.hasPin) start() else pin.set(start)
     }
 
@@ -1150,6 +1190,14 @@ class MainActivity : Activity() {
     }
 
     fun openSettings() = withSettingsAccess { openOverlay(SettingsPanel(this)) }
+
+    private fun kidsReady() = repo.apps.any { it.packageName in family.allowed }
+
+    /** The Kids Mode chip on Home: start kids mode, or set it up first. */
+    private fun openKidsChip() {
+        if (kidsReady()) startKidsMode()
+        else withSettingsAccess { SettingsPanel(this).also { openOverlay(it); it.openKidsMode() } }
+    }
     fun openAllApps() = openOverlay(AllAppsOverlay(this))
     fun openAppMenu(e: AppEntry, inFav: Boolean) = withSettingsAccess { openOverlay(AppMenuOverlay(this, e, inFav)) }
 
@@ -1469,6 +1517,7 @@ class MainActivity : Activity() {
         private const val REQ_IMPORT = 11
         private const val REQ_HOME_ROLE = 9
         private const val HOME_PROMPT_DELAY_MS = 1_500L
+        private const val SETUP_RETURN_MS = 120_000L
         const val WIFI_NAME_HEADING = "Show your Wi-Fi name?"
         const val WIFI_NAME_MESSAGE = "Android asks for location permission before any app can read the name of " +
             "your Wi-Fi network. GlowHome needs it only to show your Wi-Fi name on Home and never uses your location.\n" +

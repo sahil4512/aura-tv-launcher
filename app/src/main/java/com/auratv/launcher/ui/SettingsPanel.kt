@@ -190,6 +190,12 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         render(focusFirst = false)
     }
 
+    /** Opens the Kids Mode page (from the Kids Mode chip on Home before any kids apps are chosen). */
+    fun openKidsMode() {
+        val i = sections.indexOfFirst { it.title == "Kids Mode" }
+        if (i >= 0) showSection(i)
+    }
+
     /** Opens System → Home Button directly (from the first-start prompt on Fire TV). */
     fun openHomeButton() {
         val i = sections.indexOfFirst { it.title == "System" }
@@ -579,6 +585,7 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
                 activity.wallpaper.refresh(); activity.applyAppearance()
             }, "Solid is the lightest; Ambient glow takes the colour of the focused app"),
             Toggle("Greeting", "“Good Evening” above the clock", { p.showGreeting }, { p.showGreeting = it; activity.applyAppearance() }),
+            Toggle("Kids Mode button", "On Home, next to Settings", { p.showKidsChip }, { p.showKidsChip = it; activity.applyAppearance() }),
         )
     }
 

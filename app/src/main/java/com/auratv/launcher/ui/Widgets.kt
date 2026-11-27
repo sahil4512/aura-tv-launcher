@@ -151,7 +151,7 @@ class EdgeSafeScrollView(context: Context, private val focusMargin: Int, private
 }
 
 /**
- * Pill-shaped quick action on Home ("All Apps", the Wi-Fi network, "Settings"): a drawn glyph and a
+ * Pill-shaped quick action on Home ("All Apps", the Wi-Fi network, "Kids Mode", "Settings"): a drawn glyph and a
  * short label. Focused = filled with the theme text colour (dark glyph), slightly enlarged.
  */
 class ChipButton(context: Context, private val icon: Int, text: String) : View(context) {
@@ -160,7 +160,11 @@ class ChipButton(context: Context, private val icon: Int, text: String) : View(c
         textSize = 13f * com.auratv.launcher.util.Dp.density
         typeface = Style.MEDIUM
     }
-    private val settingsGlyph = if (icon == ICON_GEAR) context.getDrawable(com.auratv.launcher.R.drawable.ic_system)?.mutate() else null
+    private val settingsGlyph = when (icon) {
+        ICON_GEAR -> context.getDrawable(com.auratv.launcher.R.drawable.ic_system)?.mutate()
+        ICON_KIDS -> context.getDrawable(com.auratv.launcher.R.drawable.ic_chip_kids)?.mutate()
+        else -> null
+    }
     var text: String = text
         set(v) { if (field != v) { field = v; contentDescription = v; requestLayout(); invalidate() } }
 
@@ -251,7 +255,7 @@ class ChipButton(context: Context, private val icon: Int, text: String) : View(c
                 c.drawLine(x + s * 0.55f, y + s * 0.1f, x + s, y + s * 0.5f, p)
                 c.drawLine(x + s * 0.55f, y + s * 0.9f, x + s, y + s * 0.5f, p)
             }
-            ICON_GEAR -> {
+            ICON_GEAR, ICON_KIDS -> {
                 settingsGlyph?.apply {
                     setBounds(x.toInt(), y.toInt(), (x + s).toInt(), (y + s).toInt())
                     setTint(ink)
@@ -267,5 +271,6 @@ class ChipButton(context: Context, private val icon: Int, text: String) : View(c
         const val ICON_WIFI_OFF = 2
         const val ICON_GEAR = 3
         const val ICON_EXIT = 4
+        const val ICON_KIDS = 5
     }
 }

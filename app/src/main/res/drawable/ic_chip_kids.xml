@@ -1,0 +1,7 @@
+<!-- Kids Mode chip on Home: a one-colour smiley, tinted like the other chip glyphs (the ring is a reversed inner circle, so it needs no fillType on API 22). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFAF6EC"
+        android:pathData="M12,1.5a10.5,10.5 0,1 1,0 21a10.5,10.5 0,1 1,0 -21z M12,3.6a8.4,8.4 0,1 0,0 16.8a8.4,8.4 0,1 0,0 -16.8z"/>
+    <path android:fillColor="#FFFAF6EC" android:pathData="M7.6,9.6a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0z M13.4,9.6a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0z"/>
+    <path android:strokeColor="#FFFAF6EC" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M7.8,14.2 Q12,18.6 16.2,14.2"/>
+</vector>

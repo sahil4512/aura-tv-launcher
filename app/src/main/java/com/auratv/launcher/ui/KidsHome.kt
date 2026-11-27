@@ -52,6 +52,7 @@ class KidsHome(private val activity: MainActivity) : FrameLayout(activity) {
         compoundDrawablePadding = 7.dp
         setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_grownups, 0, 0, 0)
     }
+    private val ticker = MinuteTicker { updateScene() }
     private var clockMinute = -1
     private var use24Hours = false
     private var dayScene: Boolean? = null
@@ -129,7 +130,7 @@ class KidsHome(private val activity: MainActivity) : FrameLayout(activity) {
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction(Intent.ACTION_TIMEZONE_CHANGED)
         })
-        updateScene()
+        ticker.start()
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
@@ -139,10 +140,11 @@ class KidsHome(private val activity: MainActivity) : FrameLayout(activity) {
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        if (visibility == View.VISIBLE && isAttachedToWindow) updateScene()
+        if (visibility == View.VISIBLE && isAttachedToWindow) ticker.start() else ticker.stop()
     }
 
     override fun onDetachedFromWindow() {
+        ticker.stop()
         activity.unregisterReceiver(timeChanges)
         dayScene = null
         background = null

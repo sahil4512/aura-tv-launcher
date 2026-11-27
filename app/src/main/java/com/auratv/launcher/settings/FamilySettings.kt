@@ -23,6 +23,20 @@ class FamilySettings(context: Context) {
         set(value) { store.edit().putStringSet("allowed", value.toSet()).apply() }
 
     fun saveVerifier(encoded: String) { store.edit().putString("pin", encoded).apply() }
+
+    /** Milliseconds until another PIN attempt is allowed (0 when it is allowed now). */
+    fun waitMs(now: Long = System.currentTimeMillis()): Long =
+        PinThrottle.waitMs(store.getLong("locked_until", 0L), now)
+
+    /** Records a wrong PIN; returns how long the keypad now waits (0 for no wait). */
+    fun recordFailure(now: Long = System.currentTimeMillis()): Long {
+        val failures = store.getInt("failures", 0) + 1
+        val wait = PinThrottle.waitAfter(failures)
+        store.edit().putInt("failures", failures).putLong("locked_until", if (wait > 0) now + wait else 0L).apply()
+        return wait
+    }
+
+    fun clearFailures() { store.edit().remove("failures").remove("locked_until").apply() }
     private fun deviceVerifier(digits: String): String? {
         if (Build.VERSION.SDK_INT < 23) return null
         return try { DevicePin.encode(digits) } catch (e: Exception) {
@@ -46,6 +60,22 @@ class FamilySettings(context: Context) {
         deviceVerifier(digits)?.let { if (store.getString("pin", null) == saved) saveVerifier(it) }
         return true
     }
+}
+
+internal object PinThrottle {
+    const val FREE_TRIES = 5
+    const val BASE_WAIT_MS = 30_000L
+    const val MAX_WAIT_MS = 15 * 60_000L
+
+    /** 30 s after the 5th wrong PIN, doubling with each further one, up to 15 minutes. */
+    fun waitAfter(failures: Int): Long {
+        if (failures < FREE_TRIES) return 0L
+        val steps = (failures - FREE_TRIES).coerceAtMost(5)
+        return (BASE_WAIT_MS shl steps).coerceAtMost(MAX_WAIT_MS)
+    }
+
+    /** A clock set backwards can't stretch the wait beyond its longest value. */
+    fun waitMs(lockedUntil: Long, now: Long): Long = (lockedUntil - now).coerceIn(0L, MAX_WAIT_MS)
 }
 
 internal object PinVerifier {

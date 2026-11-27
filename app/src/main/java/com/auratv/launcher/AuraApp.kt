@@ -22,12 +22,31 @@ class AuraApp : Application() {
         prefs = Prefs(this)
         isRedirectProcess = currentProcessName().endsWith(":redirect")
         if (isRedirectProcess) return
+        // Home reads kids-mode state in onCreate; start loading that small file now, off the main
+        // thread, so the first frame never waits on disk for it.
+        getSharedPreferences("family", MODE_PRIVATE)
         tiles = TileCache(this)
         repo = AppRepository(this, prefs)
         repo.tileInvalidator = { tiles.invalidatePackage(it) }
         repo.onScanned = { tiles.prune(it) }
         repo.registerPackageReceiver()
+        forgetLastAppOnStandby()
         com.auratv.launcher.util.StartupTrace.mark("app")
+    }
+
+    /**
+     * Home focuses the app you were last using, so OK reopens it after it closes on its own. After
+     * the TV has been switched off that looks like the app is about to open by itself (a TCL woke to
+     * a big "YouTube" with its card selected), so standby and a fresh boot forget it and Home starts on the first card.
+     */
+    private fun forgetLastAppOnStandby() {
+        // Started within a few minutes of the TV booting: that is a switch-on too.
+        if (android.os.SystemClock.elapsedRealtime() < 3 * 60_000L) prefs.lastLaunchedKey = ""
+        registerReceiver(object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, i: android.content.Intent) {
+                prefs.lastLaunchedKey = ""
+            }
+        }, android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_OFF))
     }
 
     private fun currentProcessName(): String = try {

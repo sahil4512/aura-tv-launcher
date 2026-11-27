@@ -14,6 +14,11 @@ import com.auratv.launcher.util.dp
 import com.auratv.launcher.util.sizeDp
 
 class FamilyPin(private val activity: MainActivity, private val family: FamilySettings) {
+    private fun waitMessage(ms: Long): String {
+        val seconds = (ms + 999) / 1000
+        return if (seconds < 60) "Too many tries. Wait $seconds s." else "Too many tries. Wait ${(seconds + 59) / 60} min."
+    }
+
     private var dialog: Dialog? = null
     fun dismiss() { dialog?.dismiss() }
     fun verify(done: () -> Unit) = show(false, done)
@@ -87,6 +92,7 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
             when {
                 setting && first == null -> { first = entry; title.text = "Confirm PIN"; display() }
                 setting && first != entry -> { first = null; showError("PINs differ. Try again.") }
+                !setting && family.waitMs() > 0 -> showError(waitMessage(family.waitMs()))
                 else -> {
                     busy = true
                     title.text = if (setting) "Saving PIN…" else "Checking PIN…"
@@ -100,11 +106,17 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
                             busy = false
                             if (checked?.first == true) {
                                 checked.second?.let(family::saveVerifier)
+                                family.clearFailures()
                                 prompt.dismiss()
                                 done()
                             } else {
                                 if (setting) first = null
-                                showError(if (checked == null) "PIN unavailable. Try again." else "Wrong PIN. Try again.")
+                                val wait = if (checked != null && !setting) family.recordFailure() else 0L
+                                showError(when {
+                                    checked == null -> "PIN unavailable. Try again."
+                                    wait > 0 -> waitMessage(wait)
+                                    else -> "Wrong PIN. Try again."
+                                })
                             }
                         }
                     }
@@ -124,6 +136,7 @@ class FamilyPin(private val activity: MainActivity, private val family: FamilySe
             pad.addView(row)
         }
         display()
+        if (!setting && family.waitMs() > 0) showError(waitMessage(family.waitMs()))
         prompt.setContentView(pad)
         prompt.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         prompt.setOnDismissListener { if (dialog === prompt) dialog = null }

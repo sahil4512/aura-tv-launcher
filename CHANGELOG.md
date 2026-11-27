@@ -5,6 +5,13 @@
 - Remote Buttons has separate setup paths for a button pressed on GlowHome and a button that opens a branded app. You can test a direct shortcut before saving it and restore the original action later. Settings sections also open when clicked with a pointer.
 - TV Settings and TV Inputs have dedicated tile icons. Kids Home draws its scenery at screen resolution. The PIN field uses a muted coral outline and keeps “Wrong PIN. Try again.” visible until the next digit.
 - Settings can be exported and restored using the system file picker or a connected removable drive. SMB shares are available through document providers.
+- **Kids Mode button on Home.** The top row reads All Apps · Wi-Fi · Kids Mode · Settings. Once kids apps are chosen, one press starts kids mode; before that it opens the Kids Mode settings page. Settings → Appearance → *Kids Mode button* hides it.
+- **Wrong PINs slow down.** After five wrong PINs GlowHome waits 30 seconds, doubling after each further wrong try up to 15 minutes. The wait survives closing the keypad; the correct PIN clears it.
+- Starting kids mode with no apps chosen says “Choose apps kids can see first” instead of opening an empty Kids Home.
+- With settings PIN-locked, button setup stays open while you go to another app to press the button. If nobody returns within 2 minutes, settings close and ask for the PIN again.
+- GlowHome’s background notification names what is on: “Home button opens GlowHome”, “App redirects are on” or “Home button and app redirects”.
+- **The clock keeps time on every TV.** Home and Kids Home now tick on their own each minute. A TCL TV on Android 9 stopped sending Android’s minute broadcast after standby, which froze the clock.
+- After the TV is switched on (standby or restart), Home starts on the first card. Before, it highlighted the last app used, so the TV looked about to open it.
 - Keep the TV Light releases GlowHome’s artwork caches. Firmware can override its enabled default through `bool/def_keep_tv_light`.
 
 
@@ -16,7 +23,7 @@ Version code 20.
 - **Button remapping** opens a chosen replacement when a source app comes to the foreground. Mappings default to off and use the existing usage-access watcher independently of Home redirect. A source may flash. Verified with the Netflix branded key on a Fire TV Stick (Fire OS 5.2.9.5), on an API 25 emulator, and on API 31 with GlowHome as default Home. API 31 with stock Home blocked the replacement. Fire OS 8 hardware verification is pending.
 - Both features use the existing platform APIs. The minimum Android version remains 5.1 (API 22).
 - Fire TV users can enable **Open GlowHome After Restart** in Home Button settings. On a Stick running Fire OS 5.2.9.5, requesting boot priority 999 moved GlowHome from 98th to 14th in the startup notification queue.
-- The debug and release builds each passed 82 unit tests. The signed public 0.7.0 APK upgraded in place with all eight upgrade checks passing, including preservation of settings and app identity. On the API 25 emulator, the simulated Fire Home redirect landed on kids Home after a Home press and a reboot.
+- The debug and release builds each passed 84 unit tests. On a TCL Android TV 9 and a Fire TV Stick (Fire OS 5.2.9.5): the PIN slowdown, the empty-kids-apps guard, the settings-lock return, the kids and Home clocks, and the Kids Mode button were checked. The signed public 0.7.0 APK upgraded in place with all eight upgrade checks passing, including preservation of settings and app identity. On the API 25 emulator, the simulated Fire Home redirect landed on kids Home after a Home press and a reboot.
 
 ## 0.7.0 — Aura TV is now GlowHome TV (2026-11-24)
 

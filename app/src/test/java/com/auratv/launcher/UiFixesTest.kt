@@ -3,6 +3,7 @@ package com.auratv.launcher
 import android.view.KeyEvent
 import com.auratv.launcher.apps.TileTone
 import com.auratv.launcher.ui.FocusSpec
+import com.auratv.launcher.ui.MinuteClock
 import com.auratv.launcher.ui.SettingsKeys
 import com.auratv.launcher.wallpaper.DecodeSize
 import org.junit.Assert.assertEquals
@@ -109,5 +110,13 @@ class UiFixesTest {
         val before = 3840L * 2160 * 4
         val after = w.toLong() * h * 4
         assertEquals(4.0, before.toDouble() / after, 0.01)
+    }
+
+    // ---- Home clock keeps time without the system's minute broadcast
+
+    @Test fun clockTicksJustAfterEachMinute() {
+        assertEquals(60_250L, MinuteClock.delayToNextMinute(1_800_000_000_000L))      // exactly on a minute
+        assertEquals(250L, MinuteClock.delayToNextMinute(1_800_000_059_999L) - 1)   // 1 ms before a minute
+        assertEquals(30_250L, MinuteClock.delayToNextMinute(1_800_000_030_000L))
     }
 }

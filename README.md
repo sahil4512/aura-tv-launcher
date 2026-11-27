@@ -30,14 +30,23 @@ Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 
 ![GlowHome TV home screen on a Fire TV](docs/home.png)
 
-- **Kids mode.** Choose the apps your kids see on Home and set a four-digit PIN to exit.
-- **Remote Buttons.** Set up and test shortcuts with your remote.
-- **Small and light.** The v0.8.0 APK is about 1.4 MB. The TCL measured 16.3 MiB of launcher memory on kids Home with four approved apps. Earlier tests measured about 27 MB on the default solid Home screen. [See the measurements](docs/perf-tcl-tv.md). An enabled button watcher polls while the screen is on.
+## ✨ New in 0.8.0
+
+| | |
+|---|---|
+| 🧒 **Kids mode** | A Home screen with only the apps you choose. One press on **Kids Mode** starts it; leaving needs your four-digit PIN. Day and night scenery, big tiles, and it stays on after a restart. |
+| 🎮 **Remote Buttons** | Make any shortcut button open the app you want, or send a branded button (like Netflix) to a different app. Try it before you save, and restore the original any time. |
+| 🔒 **Settings lock** | Optionally require the PIN for GlowHome settings too, so little hands can't change things. |
+| 💾 **Backup to USB or NAS** | Save and restore your setup to a USB drive or a network share, not just the TV. |
+
+---
+
+- **Small and light.** The 0.8.0 APK is about 1.4 MB. On a TCL TV it used 16.3 MiB of memory on Kids Home. [See the measurements](docs/perf-tcl-tv.md).
 - **Tunes itself to your TV.** On first start, GlowHome checks your TV's memory and processor. On a
   slow or low-memory TV it picks the lightest setup by itself.
 - **Works with any standard remote.** Arrows, Select, Back, Home and Menu are all you need.
-- **Private.** No accounts, telemetry or ads. The only time it uses the internet is for the
-  optional screensaver photo (see [Privacy](#privacy)).
+- **Private.** No accounts, telemetry or ads. Your PIN and kids settings never leave the TV. The only
+  time it uses the internet is for the optional screensaver photo (see [Privacy](#privacy)).
 - **Open source** under the [MIT license](LICENSE).
 
 ---
@@ -320,7 +329,7 @@ chosen screensaver.
 | **Remote Buttons** | Set up, test and restore remote shortcuts |
 | **About** | Version, your TV model, how long Home took to start, memory in use, and how GlowHome tuned itself for this TV |
 
-**Kids mode.** Hold Select on the Settings gear to open GlowHome settings. Under **Kids Mode → Apps kids can see**, check the installed apps you want on Home. Select **Start kids mode** and choose and confirm a four-digit PIN the first time. On later visits, Start takes one press. Kids Home stays active across restarts. Kids Home follows the clock and date settings on regular Home. In grid mode, four apps fit in one row of standard TV banners. Five or six apps use three columns. The illustrated scenery follows local time. Day runs from 6 AM to 6 PM. In **Kids Mode → Scenery**, choose **Day** or **Night** to keep one scene. To return, select **Grown-ups** or press Back. Enter the PIN with the on-screen keypad or the number buttons on your remote. **Require PIN for settings** also protects settings opened through GlowHome in normal mode and is off by default. The PIN stays on this TV. If you forget it, uninstall and reinstall GlowHome to clear its local data. Kids mode controls the launcher screen. Apps, content inside them, and the TV’s own remote shortcuts have their own controls.
+**Kids mode.** Hold Select on the Settings gear to open GlowHome settings. Under **Kids Mode → Apps kids can see**, check the installed apps you want on Home. Select **Start kids mode** and choose and confirm a four-digit PIN the first time. On later visits, Start takes one press, and so does the **Kids Mode** button at the top of Home (hide it in Settings → Appearance). After five wrong PINs GlowHome waits before the next try, longer each time. Kids Home stays active across restarts. Kids Home follows the clock and date settings on regular Home. In grid mode, four apps fit in one row of standard TV banners. Five or six apps use three columns. The illustrated scenery follows local time. Day runs from 6 AM to 6 PM. In **Kids Mode → Scenery**, choose **Day** or **Night** to keep one scene. To return, select **Grown-ups** or press Back. Enter the PIN with the on-screen keypad or the number buttons on your remote. **Require PIN for settings** also protects settings opened through GlowHome in normal mode and is off by default. The PIN stays on this TV. If you forget it, uninstall and reinstall GlowHome to clear its local data. Kids mode controls the launcher screen. Apps, content inside them, and the TV’s own remote shortcuts have their own controls.
 
 **Remote Buttons.** Open Settings → Remote Buttons → **Change a button on GlowHome**. Press a shortcut, select an app, then press the same button to try it. Return to Remote Buttons to save. A direct shortcut works from regular GlowHome. Navigation, power, volume and voice keys keep their system functions. Select a saved shortcut to change it or restore its original action.
 

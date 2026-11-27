@@ -38,6 +38,7 @@ class Prefs(context: Context) {
     var themeId by str("theme", "midnight")
     var accentColor by int("accent", 0)
     var showGreeting by bool("greeting", true)
+    var showKidsChip by bool("kids_chip", true)
     var showTagline by bool("tagline", true)
     var iconSize by int("icon_size", 1)
     var showLabels by bool("labels", false)
