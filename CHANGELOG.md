@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- **Hide Amazon Home While Switching** (Fire TV, off by default, in Home Button settings). When the redirect sees Amazon Home, GlowHome covers it with its own "Opening GlowHome…" screen until GlowHome has drawn, instead of showing Amazon Home during Fire OS's switch delay. Needs overlay access granted once over ADB (`appops set com.auratv.launcher SYSTEM_ALERT_WINDOW allow`; `tools/aura-setup` grants it with usage access). Key presses during the cover are swallowed so nothing on the hidden Amazon screen opens; Back removes the cover, and it always drops after 7 s. Idea borrowed from Launcher Manager Mini's overlay approach. Not yet verified on Fire TV hardware.
+- **Hide Amazon Home While Switching** (Fire TV, off by default, in Home Button settings). When the redirect sees Amazon Home, GlowHome covers it with its own "Opening GlowHome…" screen until GlowHome has drawn, instead of showing Amazon Home during Fire OS's switch delay. Needs overlay access granted once over ADB (`appops set com.auratv.launcher SYSTEM_ALERT_WINDOW allow`; `tools/aura-setup` grants it with usage access). Key presses during the cover are swallowed so nothing on the hidden Amazon screen opens; Back on the cover means "stay on Amazon Home" (GlowHome steps aside when the already-requested start arrives; disabled in kids mode), and the cover always drops after 7 s. Turning the option on opens the TV's "Display over other apps" screen where one exists, otherwise explains the ADB command; without the permission nothing changes. Idea borrowed from Launcher Manager Mini's overlay approach. Verified on a Fire TV Stick 2nd gen (Fire OS 5.2.9.5): Amazon Home was covered on every Home press.
+- The double-press window for Amazon Home now allows for Amazon Home's own start time (about 1 s on a Fire TV Stick 2nd gen), so the user still gets about 3 s to press Home again.
 
 ## 0.8.0 — Kids mode and button remapping (release candidate)
 

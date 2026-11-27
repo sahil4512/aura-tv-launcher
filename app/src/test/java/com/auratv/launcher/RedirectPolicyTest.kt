@@ -225,4 +225,23 @@ class RedirectPolicyTest {
         assertFalse(p.decide(6_100).redirect)
         assertTrue(p.isPaused < 6_100)
     }
+
+    @Test fun doublePressCountsAmazonHomesSlowStart() {
+        // Fire TV Stick 2nd gen: Home pressed 2.4 s after GlowHome, Amazon Home's event lands 4.0 s after.
+        val p = policy()
+        p.onForeground(amazon, home, 1_000)
+        assertTrue(p.decide(1_300).redirect)
+        p.onForeground(self, "$self.ui.MainActivity", 6_000)
+        p.onForeground(amazon, home, 10_040)
+        assertFalse(p.decide(10_300).redirect)
+    }
+
+    @Test fun lateSecondPressIsRedirectedAgain() {
+        val p = policy()
+        p.onForeground(amazon, home, 1_000)
+        assertTrue(p.decide(1_300).redirect)
+        p.onForeground(self, "$self.ui.MainActivity", 6_000)
+        p.onForeground(amazon, home, 11_000)
+        assertTrue(p.decide(11_300).redirect)
+    }
 }

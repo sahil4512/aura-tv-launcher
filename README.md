@@ -233,7 +233,10 @@ What to expect:
   (`adb -s <tv-ip>:5555 shell appops set com.auratv.launcher SYSTEM_ALERT_WINDOW allow`; `aura-setup`
   does this with usage access) and turn on **Hide Amazon Home While Switching**. GlowHome then draws
   its own "Opening GlowHome…" screen over Amazon Home as soon as it appears, until GlowHome opens.
-  Remote presses during the wait are ignored so nothing opens by accident; Back removes the cover.
+  Remote presses during the wait are ignored so nothing opens by accident; Back on the cover means
+  "stay on Amazon Home". On TVs that have a "Display over other apps" screen, GlowHome opens it when
+  you turn the option on; otherwise it shows the command above. Without the permission the option
+  simply does nothing.
 - **To get to Amazon Home on purpose,** press Home twice (within 3 seconds of GlowHome appearing), or
   use Settings → System → Home Button → *Open Amazon Home*.
 - **Amazon's own Settings screens are never redirected,** so you can still use them normally.

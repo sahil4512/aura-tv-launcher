@@ -26,7 +26,9 @@ import com.auratv.launcher.R
  *   adb shell appops set <package> SYSTEM_ALERT_WINDOW allow
  *
  * The cover takes key focus so remote presses can't silently open things on the hidden Amazon
- * screen. Back removes it at once (escape hatch: shows whatever is underneath).
+ * screen. Back removes it and means "stay on Amazon Home": the redirect already requested can't be
+ * withdrawn, so a marker file tells GlowHome to step aside when it arrives. In kids mode Back is
+ * swallowed like any other key (no way out to Amazon Home).
  */
 object CoverOverlay {
     /** Longer than Fire OS's ~5 s app-switch hold, so the cover never drops just before GlowHome arrives. */
@@ -41,9 +43,31 @@ object CoverOverlay {
     fun permitted(ctx: Context): Boolean = Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(ctx)
 
     /** What a key press does while the cover is up. Pure (unit tested). */
-    enum class KeyAction { HIDE, CONSUME }
-    fun keyAction(keyCode: Int): KeyAction =
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) KeyAction.HIDE else KeyAction.CONSUME
+    enum class KeyAction { STAY_ON_AMAZON, CONSUME }
+    fun keyAction(keyCode: Int, kidsMode: Boolean): KeyAction =
+        if (!kidsMode && (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE)) KeyAction.STAY_ON_AMAZON
+        else KeyAction.CONSUME
+
+    /** GlowHome arrival for a redirect requested at [requestedAt] should step aside if Back was pressed after it. Pure. */
+    fun cancelsRedirect(cancelledAt: Long, requestedAt: Long): Boolean =
+        cancelledAt > 0L && requestedAt > 0L && cancelledAt >= requestedAt && cancelledAt - requestedAt <= MAX_SHOW_MS
+
+    private const val CANCEL_FILE = "redirect_cancelled_at"
+
+    /** Wall-clock time Back was last pressed on the cover (0 if never). Shared by both processes via a file. */
+    fun cancelledAt(ctx: Context): Long = try {
+        java.io.File(ctx.filesDir, CANCEL_FILE).readText().trim().toLong()
+    } catch (_: Exception) { 0L }
+
+    fun clearCancel(ctx: Context) { try { java.io.File(ctx.filesDir, CANCEL_FILE).delete() } catch (_: Exception) {} }
+
+    private fun stayOnAmazon(ctx: Context) {
+        val now = System.currentTimeMillis()
+        try { java.io.File(ctx.filesDir, CANCEL_FILE).writeText(now.toString()) } catch (_: Exception) {}
+        // Tell the watcher (on its own thread) not to redirect this Amazon Home visit again.
+        try { ctx.startService(android.content.Intent(ctx, HomeRedirectService::class.java).setAction(HomeRedirect.ACTION_ALLOW_AMAZON)) } catch (_: Exception) {}
+        hideNow("back: staying on Amazon Home")
+    }
 
     /** Shows the cover (no-op without permission). Runs [then] on the main thread once it is added. */
     fun show(ctx: Context, then: () -> Unit) {
@@ -83,7 +107,8 @@ object CoverOverlay {
         }
         val v = object : FrameLayout(ctx) {
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                if (event.action == KeyEvent.ACTION_UP && keyAction(event.keyCode) == KeyAction.HIDE) hideNow("back")
+                if (event.action == KeyEvent.ACTION_UP &&
+                    keyAction(event.keyCode, RedirectRuntime.config.kidsMode) == KeyAction.STAY_ON_AMAZON) stayOnAmazon(ctx)
                 return true
             }
         }.apply {

@@ -159,6 +159,14 @@ object HomeRedirect {
 
     fun overlayCommand(ctx: Context) = "adb shell appops set ${ctx.packageName} SYSTEM_ALERT_WINDOW allow"
 
+    /** Opens Android's "Display over other apps" screen for GlowHome, if this TV has one. */
+    fun openOverlaySettings(activity: android.app.Activity): Boolean {
+        if (Build.VERSION.SDK_INT < 23) return false
+        val i = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${activity.packageName}"))
+        if (i.resolveActivity(activity.packageManager) == null) return false
+        return try { activity.startActivity(i); true } catch (_: Exception) { false }
+    }
+
     /** Called by the UI once a redirect has drawn GlowHome: removes the cover in the ":redirect" process. */
     fun hideCover(ctx: Context) {
         if (!RedirectRuntime.serviceActive && !(Prefs(ctx).redirectEnabled && Prefs(ctx).redirectCover)) return

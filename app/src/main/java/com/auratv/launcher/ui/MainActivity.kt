@@ -1031,6 +1031,16 @@ class MainActivity : Activity() {
         val requestedAt = i!!.getLongExtra(HomeRedirect.EXTRA_REQUESTED_AT, 0L)
         val source = i.getStringExtra(HomeRedirect.EXTRA_SOURCE) ?: "?"
         i.removeExtra(HomeRedirect.EXTRA_DETECTED_AT)
+        // Back was pressed on the redirect cover: the user chose Amazon Home after we had asked for
+        // GlowHome. That start can't be withdrawn, so step aside now that it has arrived.
+        val cover = com.auratv.launcher.redirect.CoverOverlay
+        if (prefs.redirectCover && kidsHome == null && cover.cancelsRedirect(cover.cancelledAt(this), requestedAt)) {
+            cover.clearCancel(this)
+            Log.i(TAG, "redirect arrived after Back on the cover: returning to Amazon Home")
+            HomeRedirect.hideCover(this)
+            HomeRedirect.openAmazonHome(this)
+            return
+        }
         window.decorView.post {
             HomeRedirect.hideCover(this)
             val shown = System.currentTimeMillis()

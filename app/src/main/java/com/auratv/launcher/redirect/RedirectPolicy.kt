@@ -119,7 +119,9 @@ class RedirectPolicy(
         const val AMAZON_LAUNCHER = "com.amazon.tv.launcher"
         /** Fire TV Settings packages (com.amazon.tv.settings, com.amazon.tv.settings.v2). */
         val AMAZON_SETTINGS_PREFIXES = listOf("com.amazon.tv.settings")
-        const val DOUBLE_PRESS_WINDOW_MS = 3_000L
+        /** Measured between GlowHome's and Amazon Home's foreground events. Includes Amazon Home's own
+         *  start time (about 1 s on a Fire TV Stick 2nd gen), so the user still gets about 3 s to press. */
+        const val DOUBLE_PRESS_WINDOW_MS = 4_500L
         /** Faster than anyone can see Aura and press Home again (measured race: 4–5 ms on API 25). */
         const val MIN_REACTION_MS = 400L
         const val ALLOW_WINDOW_MS = 10_000L
