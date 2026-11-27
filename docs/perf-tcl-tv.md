@@ -19,3 +19,19 @@ What made the difference:
 - Precompiling all of Aura's code (`cmd package compile -m speed -f com.auratv.launcher`) cut its own launch by about 20 % on this chip. Android resets this on every update, so `tools/aura-setup` redoes it after each install.
 
 0.6.3 start-up checkpoints (ms since the process started, a launch where the process already existed): screen created → views +55 → content bound +85 → first layout +160 → first frame drawn +210, i.e. about 0.5 s from screen creation to the first frame.
+
+## Kids mode on the TCL (2026-11-25)
+
+We compared two 0.8.0 release candidates on the same TV with four approved apps, cached artwork and the button watcher off. Both builds used release optimizations and Android's speed precompilation. We used a separate install to preserve the household PIN and settings. Each cold start began with TV Settings in front and the launcher process stopped.
+
+| Measurement | Initial kids mode | Revised kids mode |
+|---|---:|---:|
+| Cold start to first frame, median of three | 529 ms | 396 ms |
+| Cold start including the switch from TV Settings, median of three | 866 ms | 766 ms |
+| Idle launcher RAM, median of three PSS readings | 31.7 MiB | 16.3 MiB |
+| Frames drawn over eight idle seconds | 0 | 0 |
+| Process CPU ticks over the same interval | 2 | 0 |
+
+First frame is the activity-specific duration in Android's `am_activity_launch_time` event. RAM was sampled with `dumpsys meminfo` four seconds after each cold start. Idle ticks are the change in the process's user and system CPU counters.
+
+In a separate remote-input test on the same TV, the fourth digit to confirmed kids-mode exit took 8.5 seconds with the original verifier and about 1.4 seconds across three repeat entries with the revised verifier. That timing includes dispatching the remote key over ADB and observing the mode change. An existing PIN still needs one successful check with the old verifier before it upgrades. Android 5.1 retains the original verifier.

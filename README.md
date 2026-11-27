@@ -32,7 +32,7 @@ Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 
 - **Kids mode.** Choose the apps your kids see on Home and set a four-digit PIN to exit.
 - **Button remapping.** Choose a replacement for a branded remote button’s app on compatible TVs.
-- **Small and light.** The v0.8.0 APK is about 1.4 MB. Earlier TCL tests measured about 27 MB of launcher memory with the default solid Home background. An enabled button watcher polls while the screen is on.
+- **Small and light.** The v0.8.0 APK is about 1.4 MB. The TCL measured 16.3 MiB of launcher memory on kids Home with four approved apps. Earlier tests measured about 27 MB on the default solid Home screen. [See the measurements](docs/perf-tcl-tv.md). An enabled button watcher polls while the screen is on.
 - **Tunes itself to your TV.** On first start, GlowHome checks your TV's memory and processor. On a
   slow or low-memory TV it picks the lightest setup by itself.
 - **Works with any standard remote.** Arrows, Select, Back, Home and Menu are all you need.
@@ -318,7 +318,7 @@ chosen screensaver.
 | **Button Remapping** | Choose a source app and its replacement, or select **None** to remove a mapping |
 | **About** | Version, your TV model, how long Home took to start, memory in use, and how GlowHome tuned itself for this TV |
 
-**Kids mode.** Hold Select on the Settings gear to open GlowHome settings. Under **Kids Mode → Apps kids can see**, check the installed apps you want on Home. Select **Start kids mode** and choose and confirm a four-digit PIN the first time. On later visits, Start takes one press. Kids Home stays active across restarts. Use **Exit kids mode** or press Back and enter the PIN to return. **Require PIN for settings** also protects settings opened through GlowHome in normal mode and is off by default. The PIN stays on this TV. If you forget it, uninstall and reinstall GlowHome to clear its local data. Kids mode controls the launcher screen. Apps, content inside them, and the TV’s own remote shortcuts have their own controls.
+**Kids mode.** Hold Select on the Settings gear to open GlowHome settings. Under **Kids Mode → Apps kids can see**, check the installed apps you want on Home. Select **Start kids mode** and choose and confirm a four-digit PIN the first time. On later visits, Start takes one press. Kids Home stays active across restarts. To return, select **Exit kids mode** or press Back. Enter the PIN with the on-screen keypad or the number buttons on your remote. **Require PIN for settings** also protects settings opened through GlowHome in normal mode and is off by default. The PIN stays on this TV. If you forget it, uninstall and reinstall GlowHome to clear its local data. Kids mode controls the launcher screen. Apps, content inside them, and the TV’s own remote shortcuts have their own controls.
 
 **Button remapping.** Under **Button Remapping**, choose an installed source app, then the app to open in its place. This applies whenever the source app opens, including from its branded remote button. It may flash briefly. Select **None** to remove that mapping. All mappings start off. Kids mode only permits replacements on the parent’s allowed list.
 

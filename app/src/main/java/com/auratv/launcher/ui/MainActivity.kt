@@ -29,6 +29,7 @@ import com.auratv.launcher.AuraApp
 import com.auratv.launcher.apps.AppEntry
 import com.auratv.launcher.apps.AppOrdering
 import com.auratv.launcher.apps.AppRepository
+import com.auratv.launcher.apps.KeepLight
 import com.auratv.launcher.apps.RecentApps
 import com.auratv.launcher.redirect.DefaultHome
 import com.auratv.launcher.redirect.DefaultHomePolicy
@@ -140,7 +141,9 @@ class MainActivity : Activity() {
         }
         resources.configuration.let { builtDensityDpi = it.densityDpi; builtWidthDp = it.screenWidthDp; builtHeightDp = it.screenHeightDp }
 
-        if (family.active) {
+        val kidsMode = family.active
+        repo.setAllowedPackages(if (kidsMode) family.allowed else null)
+        if (kidsMode) {
             repo.loadCached()
             val kids = KidsHome(this)
             kidsHome = kids
@@ -271,9 +274,12 @@ class MainActivity : Activity() {
 
     /** Runs a few seconds after Home is left, so the app being opened is already in front (and safe). */
     private val keepLight = Runnable {
-        val pkgs = com.auratv.launcher.apps.KeepLight.targets(repo.apps, packageName)
         val app = applicationContext
-        Bg.apps.execute { com.auratv.launcher.apps.KeepLight.closeBackground(app, pkgs) }
+        val current = if (kidsHome == null) repo.apps else null
+        Bg.apps.execute {
+            val packages = if (current == null) KeepLight.targetsFromDevice(app) else KeepLight.targets(current, app.packageName)
+            KeepLight.closeBackground(app, packages)
+        }
     }
 
     override fun onStop() {
@@ -1113,7 +1119,12 @@ class MainActivity : Activity() {
     }
 
     fun startKidsMode() {
-        val start = { family.active = true; HomeRedirect.apply(this, prefs); recreate() }
+        val start = {
+            family.active = true
+            tiles.trimMemory()
+            HomeRedirect.apply(this, prefs)
+            recreate()
+        }
         if (family.hasPin) start() else pin.set(start)
     }
 

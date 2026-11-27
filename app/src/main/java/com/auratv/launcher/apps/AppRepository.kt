@@ -34,6 +34,15 @@ class AppRepository(private val ctx: Context, private val prefs: Prefs) {
 
     private val listeners = ArrayList<Listener>()
     private val cacheFile = File(ctx.filesDir, "apps.tsv")
+    private var allowedPackages: Set<String>? = null
+
+    /** Switch catalogs before loading Home. Only the full catalog owns the disk cache and favourites. */
+    fun setAllowedPackages(packages: Set<String>?) {
+        if (packages == allowedPackages) return
+        allowedPackages = packages?.toSet()
+        apps = emptyList()
+    }
+
     private var scanning = false
     private var rescanRequested = false
     var tileInvalidator: ((String) -> Unit)? = null
@@ -47,7 +56,10 @@ class AppRepository(private val ctx: Context, private val prefs: Prefs) {
     fun loadCached(): List<AppEntry> {
         if (apps.isNotEmpty()) return apps
         apps = try {
-            if (cacheFile.exists()) cacheFile.readLines().mapNotNull { AppEntry.parse(it) } else emptyList()
+            val allowed = allowedPackages
+            if (cacheFile.exists()) cacheFile.useLines { lines ->
+                lines.mapNotNull { AppEntry.parse(it) }.filter { allowed == null || it.packageName in allowed }.toList()
+            } else emptyList()
         } catch (e: Exception) {
             emptyList()
         }
@@ -61,13 +73,22 @@ class AppRepository(private val ctx: Context, private val prefs: Prefs) {
             return
         }
         scanning = true
+        val allowed = allowedPackages
         Bg.apps.execute {
             val t0 = System.nanoTime()
-            val result = try { scan() } catch (e: Exception) { Log.w(TAG, "scan failed", e); null }
+            val result = try { scan(allowed) } catch (e: Exception) { Log.w(TAG, "scan failed", e); null }
             Log.i(TAG, "scan: ${result?.size} apps in ${(System.nanoTime() - t0) / 1_000_000} ms")
             Bg.main.post {
                 scanning = false
-                if (result != null) { apply(result); onScanned?.invoke(result) }
+                if (result != null && allowed == allowedPackages) {
+                    if (allowed == null) {
+                        apply(result)
+                        onScanned?.invoke(result)
+                    } else if (result != apps) {
+                        apps = result
+                        listeners.toList().forEach { it.onAppsChanged(result) }
+                    }
+                }
                 if (rescanRequested) {
                     rescanRequested = false
                     refresh()
@@ -103,10 +124,8 @@ class AppRepository(private val ctx: Context, private val prefs: Prefs) {
         if (changed || !prefs.favoritesSeeded) listeners.toList().forEach { it.onAppsChanged(result) }
     }
 
-    private fun scan(): List<AppEntry> {
+    private fun scan(allowed: Set<String>?): List<AppEntry> {
         val pm = ctx.packageManager
-        val lean = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
-        val normal = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
         val byPkg = LinkedHashMap<String, AppEntry>()
         fun add(ri: android.content.pm.ResolveInfo, isLean: Boolean) {
             val ai = ri.activityInfo ?: return
@@ -127,8 +146,14 @@ class AppRepository(private val ctx: Context, private val prefs: Prefs) {
                 updatedAt = pi?.lastUpdateTime ?: 0L,
             )
         }
-        lean.forEach { add(it, true) }
-        normal.forEach { add(it, false) }
+        // A scoped query avoids loading labels and resources from every installed TV app.
+        for (pkg in allowed ?: listOf(null)) {
+            val lean = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER).setPackage(pkg)
+            pm.queryIntentActivities(lean, 0).forEach { add(it, true) }
+            if (pkg != null && pkg in byPkg) continue
+            val normal = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg)
+            pm.queryIntentActivities(normal, 0).forEach { add(it, false) }
+        }
         return byPkg.values.toList()
     }
 

@@ -2,6 +2,7 @@ package com.auratv.launcher.apps
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 
 /**
@@ -21,6 +22,21 @@ object KeepLight {
     /** The packages to close, from the launchable apps: each once, minus the protected ones. */
     fun targets(apps: List<AppEntry>, self: String): List<String> =
         apps.asSequence().map { it.packageName }.distinct().filterNot { skip(it, self) }.toList()
+
+    /** Kids Home keeps only its allowed apps in memory. Get names for cleanup after leaving Home. */
+    fun targetsFromDevice(ctx: Context): List<String> {
+        val packages = LinkedHashSet<String>()
+        for (category in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(category)
+            for (result in ctx.packageManager.queryIntentActivities(intent, 0)) {
+                val info = result.activityInfo ?: continue
+                val pkg = info.packageName
+                if (info.enabled && info.applicationInfo.enabled && pkg !in AppOrdering.NEVER_SHOW && !skip(pkg, ctx.packageName))
+                    packages.add(pkg)
+            }
+        }
+        return packages.toList()
+    }
 
     /** Off the UI thread: ends the background processes of [packages]; returns how many were asked. */
     fun closeBackground(ctx: Context, packages: List<String>): Int {

@@ -1,6 +1,8 @@
 package com.auratv.launcher.settings
 
 import android.content.Context
+import android.os.Build
+import android.util.Log
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
@@ -21,7 +23,29 @@ class FamilySettings(context: Context) {
         set(value) { store.edit().putStringSet("allowed", value.toSet()).apply() }
 
     fun saveVerifier(encoded: String) { store.edit().putString("pin", encoded).apply() }
-    fun matches(digits: String) = PinVerifier.matches(digits, store.getString("pin", null))
+    private fun deviceVerifier(digits: String): String? {
+        if (Build.VERSION.SDK_INT < 23) return null
+        return try { DevicePin.encode(digits) } catch (e: Exception) {
+            Log.w("GlowHome", "Device PIN key unavailable", e)
+            null
+        }
+    }
+
+    fun encodePin(digits: String): String {
+        require(digits.length == 4 && digits.all { it in '0'..'9' })
+        return deviceVerifier(digits) ?: PinVerifier.encode(digits)
+    }
+
+    fun matches(digits: String): Boolean {
+        val saved = store.getString("pin", null) ?: return false
+        if (saved.startsWith(DevicePin.PREFIX)) {
+            return Build.VERSION.SDK_INT >= 23 && DevicePin.matches(digits, saved)
+        }
+        if (!PinVerifier.matches(digits, saved)) return false
+        // Upgrade an existing PIN only after it was verified. Older TVs keep the existing format.
+        deviceVerifier(digits)?.let { if (store.getString("pin", null) == saved) saveVerifier(it) }
+        return true
+    }
 }
 
 internal object PinVerifier {
