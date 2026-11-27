@@ -47,6 +47,10 @@ import java.io.File
 
 class MainActivity : Activity() {
 
+    val family by lazy { com.auratv.launcher.settings.FamilySettings(this) }
+    val pin by lazy { FamilyPin(this, family) }
+    private var kidsHome: KidsHome? = null
+
     lateinit var prefs: Prefs
     lateinit var repo: AppRepository
     lateinit var tiles: TileCache
@@ -109,7 +113,10 @@ class MainActivity : Activity() {
     private var fullyDrawnReported = false
     private var wallpaperShown = false
 
-    private val appsListener = AppRepository.Listener { bindRows(); refreshRecents() }
+    private val appsListener = AppRepository.Listener {
+        val kids = kidsHome
+        if (kids != null) kids.bind() else { bindRows(); refreshRecents() }
+    }
 
     // =====================================================================
     // Lifecycle
@@ -132,6 +139,19 @@ class MainActivity : Activity() {
             prefs.sp.edit().putBoolean("bg_solid_062", true).apply()
         }
         resources.configuration.let { builtDensityDpi = it.densityDpi; builtWidthDp = it.screenWidthDp; builtHeightDp = it.screenHeightDp }
+
+        if (family.active) {
+            repo.loadCached()
+            val kids = KidsHome(this)
+            kidsHome = kids
+            setContentView(kids)
+            kids.bind()
+            repo.addListener(appsListener)
+            repo.refresh()
+            HomeRedirect.apply(this, prefs)
+            noteRedirectArrival(intent)
+            return
+        }
 
         val trace = com.auratv.launcher.util.StartupTrace
         trace.mark("activity")
@@ -184,7 +204,7 @@ class MainActivity : Activity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus) return
+        if (!hasFocus || kidsHome != null) return
         if (homePromptPending) {
             homePromptPending = false
             Bg.main.postDelayed(homePrompt, 800)
@@ -200,7 +220,7 @@ class MainActivity : Activity() {
     }
 
     private fun maybeOfferDefaultHome() {
-        if (isFinishing || isDestroyed || prefs.homePromptAnswered) return
+        if (isFinishing || isDestroyed || family.active || family.lockSettings || prefs.homePromptAnswered) return
         // Another window (a permission dialog) is in front: ask once it is gone.
         if (!hasWindowFocus()) { homePromptPending = true; return }
         // One of Aura's own overlays is open: try again shortly.
@@ -226,9 +246,7 @@ class MainActivity : Activity() {
 
     private fun goDefaultHome(route: DefaultHomePolicy.Route) {
         if (route == DefaultHomePolicy.Route.FIRE_TV) {
-            val s = SettingsPanel(this)
-            openOverlay(s)
-            s.openHomeButton()
+            withSettingsAccess { SettingsPanel(this).also { openOverlay(it); it.openHomeButton() } }
         } else if (DefaultHome.start(this, route, REQ_HOME_ROLE)) {
             homeStepStarted = true
         } else {
@@ -239,6 +257,7 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         Bg.main.removeCallbacks(keepLight) // back on Home within a few seconds: leave everything as it was
+        if (kidsHome != null) return
         wallpaper.onStart()
         noteUserActivity() // motion runs again for a while whenever Home comes back
         refreshRecents()
@@ -260,6 +279,9 @@ class MainActivity : Activity() {
     override fun onStop() {
         super.onStop()
         if (prefs.keepTvLight) Bg.main.postDelayed(keepLight, 4_000)
+        pin.dismiss()
+        if (kidsHome != null) return
+        if (family.lockSettings) while (overlays.isNotEmpty()) closeOverlay(overlays.last(), animate = false)
         wallpaper.onStop()
         Bg.main.removeCallbacks(idleMotionPause)
         try { unregisterReceiver(netReceiver) } catch (_: Exception) {}
@@ -334,7 +356,7 @@ class MainActivity : Activity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
-            wallpaper.releaseMemory()
+            if (::wallpaper.isInitialized) wallpaper.releaseMemory()
             thumbs.evictAll()
         }
     }
@@ -343,6 +365,8 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         noteRedirectArrival(intent)
+        pin.dismiss()
+        if (kidsHome != null) return
         if (moveKey != null) endMove()
         while (overlays.isNotEmpty()) closeOverlay(overlays.last(), animate = false)
         focusHome()
@@ -758,7 +782,7 @@ class MainActivity : Activity() {
         val favCells = favEntries.map { cellFor(it, true) }.toMutableList()
         val add = addCell ?: TileCell(this, null, TileView.KIND_ADD).also { c ->
             c.bindSize(w, h, false)
-            c.setOnClickListener { openOverlay(AllAppsOverlay(this, pickFavorites = true)) }
+            c.setOnClickListener { withSettingsAccess { openOverlay(AllAppsOverlay(this, pickFavorites = true)) } }
             addCell = c
         }
         (add.parent as? ViewGroup)?.removeView(add)
@@ -912,6 +936,7 @@ class MainActivity : Activity() {
     // =====================================================================
 
     fun launch(e: AppEntry, from: View?) {
+        if (family.active && e.packageName !in family.allowed) return
         if (repo.launch(e, from)) {
             prefs.launchHistory = RecentApps.recordLaunch(prefs.launchHistory, e.packageName)
             prefs.lastLaunchedKey = e.key
@@ -1041,6 +1066,7 @@ class MainActivity : Activity() {
     // =====================================================================
 
     fun openOverlay(o: Overlay) {
+        if (family.active) return
         if (overlays.isEmpty()) {
             lastHomeFocus = currentFocus
             homeLayer.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
@@ -1081,9 +1107,25 @@ class MainActivity : Activity() {
         wallpaperView.frozen = overlays.any { it.coversWallpaper }
     }
 
-    fun openSettings() = openOverlay(SettingsPanel(this))
+    private fun withSettingsAccess(action: () -> Unit) {
+        if (family.active) return
+        if (family.lockSettings && overlays.none { it is SettingsPanel }) pin.verify(action) else action()
+    }
+
+    fun startKidsMode() {
+        val start = { family.active = true; HomeRedirect.apply(this, prefs); recreate() }
+        if (family.hasPin) start() else pin.set(start)
+    }
+
+    fun exitKidsMode() = pin.verify {
+        family.active = false
+        HomeRedirect.apply(this, prefs)
+        recreate()
+    }
+
+    fun openSettings() = withSettingsAccess { openOverlay(SettingsPanel(this)) }
     fun openAllApps() = openOverlay(AllAppsOverlay(this))
-    fun openAppMenu(e: AppEntry, inFav: Boolean) = openOverlay(AppMenuOverlay(this, e, inFav))
+    fun openAppMenu(e: AppEntry, inFav: Boolean) = withSettingsAccess { openOverlay(AppMenuOverlay(this, e, inFav)) }
 
     fun rebuildHome() {
         bindRows()
@@ -1091,7 +1133,9 @@ class MainActivity : Activity() {
     }
 
     /** Fire TV / Android settings; [action] e.g. [Settings.ACTION_WIFI_SETTINGS] for the network page. */
-    fun openSystemSettings(action: String = Settings.ACTION_SETTINGS) {
+    fun openSystemSettings(action: String = Settings.ACTION_SETTINGS) = withSettingsAccess { launchSystemSettings(action) }
+
+    private fun launchSystemSettings(action: String) {
         // On Fire OS the Settings intent is forwarded to Amazon Home's Settings tab; tell the Home
         // redirect to leave Amazon Home alone this once, or it would bounce straight back to Aura.
         if (prefs.redirectEnabled && HomeRedirect.isFireOs(this)) {
@@ -1129,6 +1173,7 @@ class MainActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (kidsHome != null) return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_DOWN) noteUserActivity()
         if (moveKey != null && overlays.isEmpty()) {
             when (event.keyCode) {
@@ -1147,6 +1192,10 @@ class MainActivity : Activity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (kidsHome != null) {
+            if (keyCode == KeyEvent.KEYCODE_MENU) { exitKidsMode(); return true }
+            return super.onKeyDown(keyCode, event)
+        }
         val top = overlays.lastOrNull()
         if (top != null && top.onKeyDown(keyCode, event)) return true
         if (keyCode == KeyEvent.KEYCODE_MENU) {
@@ -1167,6 +1216,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (kidsHome != null) { exitKidsMode(); return }
         val top = overlays.lastOrNull()
         when {
             top != null -> if (!top.onBack()) closeOverlay(top)

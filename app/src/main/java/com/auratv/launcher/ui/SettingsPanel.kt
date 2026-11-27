@@ -70,6 +70,8 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
         SectionDef("Apps", R.drawable.ic_apps) { appsPage() },
         SectionDef("Layout", R.drawable.ic_layout) { layoutPage() },
         SectionDef("System", R.drawable.ic_system) { systemPage() },
+        SectionDef("Kids Mode", R.drawable.ic_apps) { kidsPage() },
+        SectionDef("Button Remapping", R.drawable.ic_layout) { remapPage() },
         SectionDef("About", R.drawable.ic_about) { aboutPage() },
     )
     private var section = 0
@@ -621,6 +623,65 @@ class SettingsPanel(activity: MainActivity) : Overlay(activity) {
                 activity.setHidden(e, false)
                 reload()
             }
+        }
+    }
+
+    private fun kidsPage() = Page("Kids Mode") {
+        val family = activity.family
+        listOf(
+            Action("Start kids mode", "Show only the apps you choose. Exit with your PIN.") { activity.startKidsMode() },
+            Nav("Apps kids can see", { "${activity.repo.apps.count { it.packageName in family.allowed }} selected" }) {
+                push(Page("Apps kids can see") {
+                    val selected = family.allowed
+                    AppOrdering.sortForAllApps(activity.repo.apps, 0).map { app ->
+                        Pick(app.label, null, app.packageName in selected, null) {
+                            family.allowed = if (app.packageName in selected) selected - app.packageName else selected + app.packageName
+                            reload()
+                        }
+                    }
+                })
+            },
+            Action("Set or change PIN", "If you forget your PIN, reinstall GlowHome to clear its local data.") {
+                val choose = { activity.pin.set { reload() } }
+                if (family.hasPin) activity.pin.verify(choose) else choose()
+            },
+            Toggle("Require PIN for settings", "Also lock settings in normal mode.", { family.lockSettings }) { on ->
+                val save = { family.lockSettings = on; reload() }
+                if (family.hasPin) activity.pin.verify(save) else activity.pin.set(save)
+            }
+        )
+    }
+
+    private fun remapPage() = Page("Button Remapping") {
+        val mappings = com.auratv.launcher.redirect.AppRemaps.decode(p.buttonMappings)
+        val apps = AppOrdering.sortForAllApps(activity.repo.apps, 0)
+        val labels = apps.associate { it.packageName to it.label }
+        val sources = apps.sortedBy { AppOrdering.priority(it.packageName).coerceAtMost(2) }
+        buildList {
+            add(Info("When a source app opens, its replacement opens next. The source may flash briefly.", ""))
+            add(Info("Usage access · same grant as Home redirect", if (HomeRedirect.hasUsageAccess(ctx)) "Granted" else "Required"))
+            if (!HomeRedirect.hasUsageAccess(ctx)) add(Info(HomeRedirect.usageAccessCommand(ctx), ""))
+            add(Info("Some newer TVs block the replacement when the stock launcher is Home.", ""))
+            for (source in sources) add(Nav(source.label, {
+                mappings[source.packageName]?.let { labels[it] ?: "App unavailable" } ?: "None"
+            }) {
+                push(Page(source.label) {
+                    val current = mappings[source.packageName]
+                    fun select(pkg: String?) {
+                        val updated = com.auratv.launcher.redirect.AppRemaps.decode(p.buttonMappings).toMutableMap()
+                        if (pkg == null) updated.remove(source.packageName) else updated[source.packageName] = pkg
+                        p.buttonMappings = updated.map { (src, dst) -> "$src=$dst" }
+                        applyRedirect()
+                        pop()
+                    }
+                    buildList {
+                        add(Pick("None", null, current == null, null) { select(null) })
+                        for (app in apps) if (app.packageName != source.packageName) {
+                            add(Pick(app.label, null, current == app.packageName, null) { select(app.packageName) })
+                        }
+                    }
+                })
+            })
         }
     }
 

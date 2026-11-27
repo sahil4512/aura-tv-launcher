@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0 — Kids mode and button remapping (release candidate)
+
+Version code 20.
+
+- **Kids mode** shows only the apps a parent selects. A four-digit PIN protects exit, and an optional setting also locks normal-mode settings. Kids Home survives a restart. The PIN and family settings stay on the TV.
+- **Button remapping** opens a chosen replacement when a source app comes to the foreground. Mappings default to off and use the existing usage-access watcher independently of Home redirect. A source may flash. Verified on an API 25 emulator and on API 31 with GlowHome as default Home. API 31 with stock Home blocked the replacement. Fire OS 8 hardware verification is pending.
+- Both features use the existing platform APIs. The minimum Android version remains 5.1 (API 22).
+- Candidate checks: 78 JVM tests, 72 launcher UI checks and 8 upgrade checks passed. The signed public 0.7.0 APK upgraded in place with all tested settings intact. On the API 25 emulator, the simulated Fire Home redirect landed on kids Home after a Home press and a reboot.
+
 ## 0.7.0 — Aura TV is now GlowHome TV (2026-11-24)
 
 versionCode 19.

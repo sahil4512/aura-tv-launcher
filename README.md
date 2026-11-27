@@ -30,8 +30,9 @@ Step-by-step: [Quick install (no computer)](#quick-install-no-computer) ·
 
 ![GlowHome TV home screen on a Fire TV](docs/home.png)
 
-- **Small and light.** About 1.3 MB to download and about 27 MB of memory while running. It uses
-  no CPU while idle on the home screen.
+- **Kids mode.** Choose the apps your kids see on Home and set a four-digit PIN to exit.
+- **Button remapping.** Choose a replacement for a branded remote button’s app on compatible TVs.
+- **Small and light.** The v0.8.0 APK is about 1.4 MB. Earlier TCL tests measured about 27 MB of launcher memory with the default solid Home background. An enabled button watcher polls while the screen is on.
 - **Tunes itself to your TV.** On first start, GlowHome checks your TV's memory and processor. On a
   slow or low-memory TV it picks the lightest setup by itself.
 - **Works with any standard remote.** Arrows, Select, Back, Home and Menu are all you need.
@@ -313,7 +314,15 @@ chosen screensaver.
 | **Apps** | Favourites, hidden apps, auto-add new apps, show system utilities, All Apps order, refresh app list, reset favourites |
 | **Layout** | One favourites row or an All Apps grid, tile size, row position, Recently Used row, extra All Apps row, animation speed (Relaxed / Normal / Quick / Off) |
 | **System** | TV settings shortcut, Make GlowHome Your Home Screen (Android TV) or Home Button (Fire TV), **Keep the TV Light**, backup / restore, reset |
+| **Kids Mode** | Choose allowed apps, start kids mode, set or change the PIN, and optionally lock Settings in normal mode |
+| **Button Remapping** | Choose a source app and its replacement, or select **None** to remove a mapping |
 | **About** | Version, your TV model, how long Home took to start, memory in use, and how GlowHome tuned itself for this TV |
+
+**Kids mode.** Hold Select on the Settings gear to open GlowHome settings. Under **Kids Mode → Apps kids can see**, check the installed apps you want on Home. Select **Start kids mode** and choose and confirm a four-digit PIN the first time. On later visits, Start takes one press. Kids Home stays active across restarts. Use **Exit kids mode** or press Back and enter the PIN to return. **Require PIN for settings** also protects settings opened through GlowHome in normal mode and is off by default. The PIN stays on this TV. If you forget it, uninstall and reinstall GlowHome to clear its local data. Kids mode controls the launcher screen. Apps, content inside them, and the TV’s own remote shortcuts have their own controls.
+
+**Button remapping.** Under **Button Remapping**, choose an installed source app, then the app to open in its place. This applies whenever the source app opens, including from its branded remote button. It may flash briefly. Select **None** to remove that mapping. All mappings start off. Kids mode only permits replacements on the parent’s allowed list.
+
+Remapping shares the existing Home-button watcher and its usage-access grant. Run `adb shell appops set com.auratv.launcher GET_USAGE_STATS allow` once on the connected TV. The Home redirect can stay off. In emulator tests the replacement opened on Android 7.1. On Android TV 12 it opened with GlowHome selected as Home. With the stock launcher selected, Android TV 12 detected the source launch but blocked the replacement. Fire TV keeps Amazon Home selected. Remapping on the Fire OS 8 Stick 4K is unverified. The Alexa Voice Remote Pro’s 1 and 2 buttons are configured in Amazon’s interface.
 
 **Keep the TV Light** (on by default): a few seconds after you open an app from GlowHome, GlowHome closes
 other apps that are sitting in the background using memory, for example Netflix's background
@@ -381,12 +390,12 @@ NASA), and only while GlowHome is your chosen screensaver.
 
 | Permission | Used for |
 |---|---|
-| Usage access (`PACKAGE_USAGE_STATS`) | The Fire TV Home button redirect, and the Recently Used row. Granted by you over adb; GlowHome works without it |
+| Usage access (`PACKAGE_USAGE_STATS`) | Button remapping, the Fire TV Home button redirect, and the Recently Used row. Granted by you over adb; GlowHome works without it |
 | Accessibility service | Only the experimental instant Home button mode on Fire TV. Off unless you turn it on |
 | Location (`ACCESS_COARSE_LOCATION`) | Only to show your Wi-Fi network's name in the top bar (Android 8.1+ requires it for that). GlowHome never reads your location. Say no and the chip just shows "Wi-Fi" |
 | Close background apps (`KILL_BACKGROUND_PROCESSES`) | Keep the TV Light |
 | Storage | Backup and restore of GlowHome's settings |
-| Start at boot, foreground service | Restarting the Home button redirect after the TV restarts, only if you turned it on |
+| Start at boot, foreground service | Restarting the shared watcher after a reboot when Home redirect or a button mapping is enabled |
 | Internet | The screensaver photo |
 
 ---
@@ -448,7 +457,7 @@ update each other; uninstall first when switching.
 
 | What | Command | Where it runs |
 |---|---|---|
-| Unit tests (68) | `./gradlew :app:testDebugUnitTest` | Your computer |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | Your computer |
 | Remote navigation, layout and memory-leak checks | `tools/ui_check.py` | Android TV emulator only |
 | Before / after performance | `tools/perf_compare.py` | Emulator only |
 | Home redirect and boot | `tools/redirect_check.py` | Emulator only |

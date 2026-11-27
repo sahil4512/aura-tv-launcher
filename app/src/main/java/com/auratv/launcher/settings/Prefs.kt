@@ -62,6 +62,7 @@ class Prefs(context: Context) {
 
     // Home button redirect (Fire OS). Off by default so it never competes with an existing helper.
     var redirectEnabled by bool("redirect_enabled", false)
+    var buttonMappings by list("button_mappings")
     var redirectSpeed by int("redirect_speed", 1)
     var redirectDoublePress by bool("redirect_double_press", true)
     var redirectResident by bool("redirect_resident", true)

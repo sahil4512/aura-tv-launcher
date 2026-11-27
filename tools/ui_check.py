@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 PKG = "com.auratv.launcher"
 FIX = "com.auratv.testfixture"
 ACT = PKG + "/.ui.MainActivity"
-SIDEBAR = ["Appearance", "Apps", "Layout", "System", "About"]
+SIDEBAR = ["Appearance", "Apps", "Layout", "System", "Kids Mode", "Button Remapping", "About"]
 THEMES = ["Midnight", "Minimal Dark", "Soft Glass", "Cinematic", "Warm Ambient"]
 LONG_NAME = "Aurora Streaming Service with an Extremely Long Name"
 

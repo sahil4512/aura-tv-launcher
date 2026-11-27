@@ -35,6 +35,10 @@ class HomeRedirectService : Service() {
     private var usm: UsageStatsManager? = null
     private var screenOn = true
     private var lastEventTs = 0L
+    // queryEvents overlaps the last poll. Different activities can resume in the same millisecond.
+    private val seenAtLastTime = HashSet<Pair<String, String?>>()
+    private val remaps = AppRemaps()
+    private val watchStartedAt = System.currentTimeMillis()
     private var started = false
     private var foreground = false
     private val usageAccess = UsageAccessCache()
@@ -85,9 +89,9 @@ class HomeRedirectService : Service() {
             }
         }
         // Explicit config from the UI, or (sticky restart / boot) the saved preferences.
-        val cfg = intent?.let { HomeRedirect.Config.from(it) } ?: HomeRedirect.Config.from(Prefs(this))
+        val cfg = intent?.let { HomeRedirect.Config.from(it) } ?: HomeRedirect.Config.from(this, Prefs(this))
         RedirectRuntime.config = cfg
-        if (!cfg.enabled) {
+        if (!cfg.watching) {
             shutdown()
             stopSelf()
             return START_NOT_STICKY
@@ -109,18 +113,21 @@ class HomeRedirectService : Service() {
             started = true
             Log.i(RedirectRuntime.TAG, "redirect service started (poll ${cfg.activeIntervalMs} ms, idle ${cfg.idleIntervalMs} ms)")
         }
-        handler.removeCallbacks(pollRunnable)
-        handler.post(pollRunnable)
+        handler.post {
+            handler.removeCallbacks(pollRunnable)
+            handler.removeCallbacks(recheckRunnable)
+            poll()
+        }
         return START_STICKY
     }
 
     private fun stopSelfIfDisabled() {
-        if (!RedirectRuntime.config.enabled) stopSelf()
+        if (!RedirectRuntime.config.watching) stopSelf()
     }
 
     private fun poll() {
         val cfg = RedirectRuntime.config
-        if (!cfg.enabled || !screenOn) return
+        if (!cfg.watching || !screenOn) return
         val u = usm
         if (u == null || !usageAccess.get(SystemClock.elapsedRealtime()) { HomeRedirect.hasUsageAccess(this) }) {
             handler.postDelayed(pollRunnable, 10_000) // waiting for the one-time ADB grant
@@ -136,14 +143,23 @@ class HomeRedirectService : Service() {
                 events.getNextEvent(e)
                 if (e.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND) continue
                 if (e.timeStamp < lastEventTs) continue
-                if (e.timeStamp == lastEventTs && lastEventTs != 0L && e.packageName == policy.foregroundPackage) continue
+                if (e.timeStamp > lastEventTs) seenAtLastTime.clear()
+                if (!seenAtLastTime.add(e.packageName to e.className)) continue
                 if (com.auratv.launcher.BuildConfig.DEBUG) Log.d(RedirectRuntime.TAG, "fg ${e.packageName}/${e.className} @${e.timeStamp % 100_000}")
+                if (e.timeStamp >= watchStartedAt) remaps.foreground(e.packageName)
                 policy.onForeground(e.packageName, e.className, e.timeStamp)
                 lastEventTs = e.timeStamp
             }
-            val d = policy.decide(now)
-            if (d.redirect) RedirectRuntime.launchAura(this, "usage:${d.reason}", d.homeSince)
-            else if (d.reason.startsWith("loop-guard-tripped")) Log.w(RedirectRuntime.TAG, "redirect loop detected: paused for 60 s")
+            if (cfg === RedirectRuntime.config) {
+                // Consume observations even if stale, so waking the screen never replays an old launch.
+                val target = remaps.target(cfg.mappings)
+                if (target != null && now - lastEventTs in 0..5_000) launchReplacement(target)
+                if (cfg.enabled) {
+                    val d = policy.decide(now)
+                    if (d.redirect) RedirectRuntime.launchAura(this, "usage:${d.reason}", d.homeSince)
+                    else if (d.reason.startsWith("loop-guard-tripped")) Log.w(RedirectRuntime.TAG, "redirect loop detected: paused for 60 s")
+                }
+            }
         } catch (t: Throwable) {
             Log.w(RedirectRuntime.TAG, "poll failed", t)
         }
@@ -151,11 +167,20 @@ class HomeRedirectService : Service() {
         // system anyway, so poll slowly. Another app in front → poll at the configured speed.
         val auraFront = policy.foregroundPackage == packageName
         val interval = when {
-            RedirectRuntime.accessibilityConnected -> 3_000L // events arrive from accessibility; polling is only a safety net
+            RedirectRuntime.accessibilityConnected && cfg.mappings.isEmpty() -> 3_000L // events arrive from accessibility; polling is only a safety net
             auraFront -> cfg.idleIntervalMs
             else -> cfg.activeIntervalMs
         }
         handler.postDelayed(pollRunnable, interval)
+    }
+
+    private fun launchReplacement(pkg: String) {
+        val intent = packageManager.getLeanbackLaunchIntentForPackage(pkg) ?: packageManager.getLaunchIntentForPackage(pkg) ?: return
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: RuntimeException) {
+            Log.w(RedirectRuntime.TAG, "Replacement app could not open", e)
+        }
     }
 
     private fun updateForeground(resident: Boolean) {
@@ -179,7 +204,7 @@ class HomeRedirectService : Service() {
         }
         return b.setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("GlowHome TV")
-            .setContentText("Home button opens GlowHome")
+            .setContentText("Watching remote button shortcuts")
             .setOngoing(true)
             .setShowWhen(false)
             .build()
@@ -190,7 +215,7 @@ class HomeRedirectService : Service() {
         handler.removeCallbacks(recheckRunnable)
         RedirectRuntime.serviceActive = false
         RedirectRuntime.pollNow = null
-        RedirectRuntime.config = RedirectRuntime.config.copy(enabled = false)
+        RedirectRuntime.config = HomeRedirect.Config()
         if (foreground) { stopForeground(true); foreground = false }
         started = false
     }

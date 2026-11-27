@@ -35,36 +35,49 @@ object HomeRedirect {
         val instantMode: Boolean = false,
         /** Debug builds only: treat another package as "Amazon Home" (emulator testing). */
         val homePackage: String = RedirectPolicy.AMAZON_LAUNCHER,
+        val mappings: Map<String, String> = emptyMap(),
+        val kidsMode: Boolean = false,
     ) {
+        val watching get() = enabled || mappings.isNotEmpty()
+
         fun toIntent(i: Intent): Intent = i
             .putExtra("enabled", enabled).putExtra("active", activeIntervalMs).putExtra("idle", idleIntervalMs)
             .putExtra("bypass", bypassDoublePress).putExtra("resident", resident).putExtra("instant", instantMode)
-            .putExtra("home", homePackage)
+            .putExtra("home", homePackage).putExtra("kids", kidsMode)
+            .putStringArrayListExtra("mappings", ArrayList(mappings.map { (src, dst) -> "$src=$dst" }))
 
         companion object {
-            fun from(p: Prefs) = Config(
-                enabled = p.redirectEnabled,
-                activeIntervalMs = SPEED_INTERVALS[p.redirectSpeed.coerceIn(0, 2)],
-                idleIntervalMs = 1500L,
-                bypassDoublePress = p.redirectDoublePress,
-                resident = p.redirectResident,
-                instantMode = p.redirectInstant,
-                homePackage = testHome(p) ?: RedirectPolicy.AMAZON_LAUNCHER,
-            )
+            fun from(ctx: Context, p: Prefs): Config {
+                val family = com.auratv.launcher.settings.FamilySettings(ctx)
+                val kids = family.active
+                val allowed = if (kids) family.allowed else emptySet()
+                return Config(
+                    enabled = p.redirectEnabled && isFireOs(ctx),
+                    activeIntervalMs = SPEED_INTERVALS[p.redirectSpeed.coerceIn(0, 2)],
+                    idleIntervalMs = 1500L,
+                    bypassDoublePress = !kids && p.redirectDoublePress,
+                    resident = p.redirectResident,
+                    instantMode = p.redirectInstant,
+                    homePackage = testHome(p) ?: RedirectPolicy.AMAZON_LAUNCHER,
+                    mappings = AppRemaps.decode(p.buttonMappings).filterValues { !kids || it in allowed },
+                    kidsMode = kids,
+                )
+            }
 
             fun from(i: Intent): Config? = if (!i.hasExtra("enabled")) null else Config(
                 i.getBooleanExtra("enabled", false), i.getLongExtra("active", 500L), i.getLongExtra("idle", 1500L),
                 i.getBooleanExtra("bypass", true), i.getBooleanExtra("resident", true), i.getBooleanExtra("instant", false),
                 i.getStringExtra("home") ?: RedirectPolicy.AMAZON_LAUNCHER,
+                AppRemaps.decode(i.getStringArrayListExtra("mappings").orEmpty()), i.getBooleanExtra("kids", false),
             )
         }
     }
 
     /** Pushes the current preferences to the service (starting or stopping it). */
     fun apply(ctx: Context, p: Prefs) {
-        val cfg = Config.from(p)
+        val cfg = Config.from(ctx, p)
         val svc = Intent(ctx, HomeRedirectService::class.java)
-        val run = cfg.enabled && isFireOs(ctx)
+        val run = cfg.watching
         setBootReceiverEnabled(ctx, run)
         if (run) {
             val i = cfg.toIntent(svc.setAction(ACTION_APPLY))

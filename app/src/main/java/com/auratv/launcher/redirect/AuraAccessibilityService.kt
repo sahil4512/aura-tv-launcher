@@ -32,7 +32,7 @@ class AuraAccessibilityService : AccessibilityService() {
         if (!cfg.enabled || !cfg.instantMode || event.keyCode != KeyEvent.KEYCODE_HOME) return false
         if (event.action == KeyEvent.ACTION_UP) {
             val held = event.eventTime - event.downTime
-            if (held >= LONG_PRESS_MS) {
+            if (held >= LONG_PRESS_MS && !cfg.kidsMode) {
                 // Escape hatch: hold Home → Amazon Home (and it won't be redirected).
                 Log.i(RedirectRuntime.TAG, "Home held ${held} ms: opening Amazon Home")
                 RedirectRuntime.policy(this).allowAmazonOnce(System.currentTimeMillis())
