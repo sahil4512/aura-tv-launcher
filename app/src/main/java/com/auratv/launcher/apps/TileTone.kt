@@ -1,5 +1,7 @@
 package com.auratv.launcher.apps
 
+import kotlin.math.roundToInt
+
 /**
  * Brightness balance for app cards (pure, unit-tested). Applied once when a card is rendered and
  * cached, so it costs nothing per frame.
@@ -25,6 +27,18 @@ object TileTone {
         return (t * MAX_SHADE + 0.5f).toInt()
     }
 
-    /** The glass top sheen brightens dark/colourful cards; on near-white ones it only adds glare. */
-    fun wantsSheen(edgeLuma: Float): Boolean = edgeLuma <= WHITE_EDGE
+    fun isWideArtwork(w: Int, h: Int) = w > 0 && h > 0 && w.toFloat() / h >= 1.35f
+
+    /** Fit the complete drawable. Some Fire TV apps declare a landscape launcher icon. */
+    fun artworkSize(sourceW: Int, sourceH: Int, w: Int, h: Int, solidEdge: Boolean): Pair<Int, Int> {
+        val sw = sourceW.coerceAtLeast(1)
+        val sh = sourceH.takeIf { it > 0 } ?: sw
+        val heightFraction = when {
+            isWideArtwork(sourceW, sourceH) -> 1f
+            solidEdge -> .86f
+            else -> .72f
+        }
+        val scale = minOf(w.toFloat() / sw, h * heightFraction / sh)
+        return (sw * scale).roundToInt().coerceAtLeast(1) to (sh * scale).roundToInt().coerceAtLeast(1)
+    }
 }

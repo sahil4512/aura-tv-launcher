@@ -77,9 +77,12 @@ class UiFixesTest {
         assertTrue(TileTone.MAX_SHADE <= 40) // a light shade: never distorts brand colours
     }
 
-    @Test fun sheenOnlyOnNonWhiteCards() {
-        assertTrue(TileTone.wantsSheen(0.3f))
-        assertFalse(TileTone.wantsSheen(0.98f))
+    @Test fun artworkKeepsItsShapeInsideTvTiles() {
+        assertEquals(320 to 160, TileTone.artworkSize(512, 256, 320, 180, false))
+        assertEquals(320 to 180, TileTone.artworkSize(1920, 1080, 320, 180, true))
+        assertEquals(155 to 155, TileTone.artworkSize(96, 96, 320, 180, true))
+        assertEquals(65 to 130, TileTone.artworkSize(64, 128, 320, 180, false))
+        assertEquals(130 to 130, TileTone.artworkSize(-1, -1, 320, 180, false))
     }
 
     @Test fun lumaMatchesRec709() {
